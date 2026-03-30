@@ -1,0 +1,6 @@
+Server is running on port: 3000
+Queued subscription: { type: 'mws', scrips: 'nse_cm|11536', channelnum: 1 }
+Connected to Live Feed
+Socket message: [{"stat":"Ok","type":"cn","msg":"successful","stCode":200}]
+Socket message: [{"stat":"Ok","type":"sub","msg":"successful","stCode":200}]
+Socket message: [{"ftm0":"02/01/1970 21:57:48","dtm1":"11/02/1972 08:53:12","fdtm":"30/03/2026 18:30:26","ltt":"30/03/2026 15:59:45","v":"6804756","ltp":"2358.90","ltq":"6","tbq":"13384","tsq":"0","bp":"2358.90","sp":"0.00","bq":"13384","bs":"0","ap":"2370.92","lo":"2346.20","h":"2398.00","lcl":"2123.10","ucl":"2594.70","yh":"3710.00","yl":"2346.20","op":"2375.10","c":"2389.80","mul":"1","prec":"2","cng":"-30.90","nc":"-1.29","to":"16133532095.52","name":"sf","tk":"11536","e":"nse_cm","ts":"TCS-EQ"}]

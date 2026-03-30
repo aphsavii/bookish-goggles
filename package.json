@@ -1,0 +1,22 @@
+{
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env index.js",
+    "dev": "nodemon --env-file=.env index.js"
+  },
+  "dependencies": {
+    "@valkey/valkey-glide": "^2.3.0",
+    "axios": "^1.14.0",
+    "csv-parser": "^3.2.0",
+    "express": "^5.2.1",
+    "fs": "^0.0.1-security",
+    "https": "^1.0.0",
+    "ioredis": "^5.10.1",
+    "nodemon": "^3.0.1",
+    "pg": "^8.20.0",
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
