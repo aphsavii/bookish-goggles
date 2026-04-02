@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import vm from "vm";
 import { fileURLToPath } from "url";
+import WebSocket from "ws";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,6 +13,20 @@ let loaded = false;
 export function ensureNeoHsLibLoaded() {
   if (loaded && globalThis.HSWebSocket) {
     return globalThis.HSWebSocket;
+  }
+
+  // Validate file exists before attempting to load
+  if (!fs.existsSync(HSLIB_PATH)) {
+    throw new Error(`Neo HSLib file not found at: ${HSLIB_PATH}`);
+  }
+
+  // Provide WebSocket to global scope before loading the library
+  if (typeof globalThis.WebSocket === "undefined") {
+    globalThis.WebSocket = WebSocket;
+  }
+
+  if (typeof globalThis.MozWebSocket === "undefined") {
+    globalThis.MozWebSocket = WebSocket;
   }
 
   if (typeof globalThis.window === "undefined") {
@@ -30,11 +45,15 @@ export function ensureNeoHsLibLoaded() {
     globalThis.btoa = (value) => Buffer.from(value, "binary").toString("base64");
   }
 
-  const source = fs.readFileSync(HSLIB_PATH, "utf8");
-  vm.runInThisContext(source, { filename: HSLIB_PATH });
+  try {
+    const source = fs.readFileSync(HSLIB_PATH, "utf8");
+    vm.runInThisContext(source, { filename: HSLIB_PATH });
+  } catch (error) {
+    throw new Error(`Failed to load Neo HSLib: ${error.message}`);
+  }
 
   if (!globalThis.HSWebSocket) {
-    throw new Error("Failed to load Neo HSWebSocket library");
+    throw new Error("Neo HSLib loaded but HSWebSocket not found in global scope");
   }
 
   loaded = true;

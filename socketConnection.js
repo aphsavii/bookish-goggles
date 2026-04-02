@@ -70,8 +70,21 @@ export class LiveFeedClient {
       return this.socket;
     }
 
-    const HSWebSocket = ensureNeoHsLibLoaded();
-    this.socket = new HSWebSocket(this.url);
+    try {
+      const HSWebSocket = ensureNeoHsLibLoaded();
+      
+      if (!HSWebSocket) {
+        throw new Error("HSWebSocket library failed to load - returned null");
+      }
+
+      this.socket = new HSWebSocket(this.url);
+
+      if (!this.socket) {
+        throw new Error("Failed to create HSWebSocket instance");
+      }
+    } catch (error) {
+      throw new Error(`Socket setup failed: ${error.message}`);
+    }
 
     this.socket.onopen = () => {
       this.socket.send(JSON.stringify({
