@@ -9,29 +9,12 @@ export async function fetchAndProcessStocks(filters = {}) {
       minTValue = null
     } = filters;
 
-    const apiUrl =
-      "https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O";
+    const apiUrl = "https://trade.aphsavii.workers.dev/";
 
     const response = await axios.get(apiUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        Connection: "keep-alive",
-        DNT: "1",
-        Referer: "https://www.nseindia.com/",
-        Origin: "https://www.nseindia.com",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-CH-UA": '"Chromium";v="126", "Google Chrome";v="126", "Not:A-Brand";v="99"',
-        "Sec-CH-UA-Mobile": "?0",
-        "Sec-CH-UA-Platform": '"Windows"'
-      }
     });
 
-    const stocks = response.data?.data || [];
+    const stocks = response.data?.instruments || [];
 
     // ---- STEP 1: Transform ----
     const transformed = stocks.map((data) => {
