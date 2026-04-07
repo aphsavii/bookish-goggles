@@ -14,7 +14,7 @@ export async function fetchAndProcessStocks(filters = {}) {
     const response = await axios.get(apiUrl, {
     });
 
-    const stocks = response.data?.instruments || [];
+    const stocks = response.data?.data || [];
 
     // ---- STEP 1: Transform ----
     const transformed = stocks.map((data) => {
