@@ -18,7 +18,10 @@ export const RISK_CONFIG = {
 
 export const SIGNAL_CONFIG = {
   breakoutLookback: 3,
-  volumeConfirmationMultiplier: 1.5,
+  historicalVolumeConfirmationMultiplier: 1.5,
+  todayVolumeAccelerationMultiplier: 1.2,
+  minTodayVolumeSamples: 5,
+  volumeConfirmationMode: "either",
   duplicateSignalCooldownMinutes: 5
 };
 
@@ -34,6 +37,7 @@ export const TREND_CONFIG = {
 };
 
 export const SESSION_CONFIG = {
+  noNewEntriesBefore: "09:50:00",
   noNewEntriesAfter: "15:00:00",
   squareOffAt: "15:09:00"
 };

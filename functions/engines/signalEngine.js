@@ -1,6 +1,56 @@
 import { SIGNAL_CONFIG } from "../../config/tradingConfig.js";
 import { diffMinutes } from "../../utils/time.js";
 
+function getSessionDateKey(value) {
+  if (!value) {
+    return null;
+  }
+
+  const directMatch = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (directMatch) {
+    return directMatch[1];
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().slice(0, 10);
+}
+
+function calculateTodayAverageVolume(previousCandles = [], candleStartTime) {
+  const sessionDateKey = getSessionDateKey(candleStartTime);
+  if (!sessionDateKey) {
+    return {
+      sampleCount: 0,
+      averageVolume: 0
+    };
+  }
+
+  const sameSessionCandles = previousCandles.filter((item) =>
+    getSessionDateKey(item.startTime ?? item.timestamp ?? item.bucket) === sessionDateKey &&
+    Number.isFinite(Number(item.volume))
+  );
+
+  if (sameSessionCandles.length === 0) {
+    return {
+      sampleCount: 0,
+      averageVolume: 0
+    };
+  }
+
+  const totalVolume = sameSessionCandles.reduce(
+    (sum, item) => sum + Number(item.volume),
+    0
+  );
+
+  return {
+    sampleCount: sameSessionCandles.length,
+    averageVolume: Number((totalVolume / sameSessionCandles.length).toFixed(2))
+  };
+}
+
 class SignalEngine {
   constructor() {
     this.signals = [];
@@ -31,6 +81,11 @@ class SignalEngine {
     const strategy = side === "SHORT"
       ? "Breakdown Detection + Volume Confirmation"
       : "Breakout Detection + Volume Confirmation";
+    const {
+      todayAverageVolumePerMin = 0,
+      todayVolumeAccelerationRatio = null,
+      historicalVolumeRatio = null
+    } = instrument;
 
     return {
       symbol: instrument.symbol,
@@ -41,6 +96,9 @@ class SignalEngine {
       close: candle.close,
       candleVolume: candle.volume,
       averageHistoricalVolPerMin,
+      todayAverageVolumePerMin,
+      todayVolumeAccelerationRatio,
+      historicalVolumeRatio,
       timestamp: candle.startTime
     };
   }
@@ -58,9 +116,39 @@ class SignalEngine {
     const breakoutLevel = Math.max(...referenceCandles.map((item) => item.high));
     const supportLevel = Math.min(...referenceCandles.map((item) => item.low));
     const averageHistoricalVolPerMin = instrument.averageHistoricalVolPerMin ?? 0;
-    const volumeConfirmed =
+    const {
+      averageVolume: todayAverageVolumePerMin,
+      sampleCount: todayVolumeSampleCount
+    } = calculateTodayAverageVolume(previousCandles, candle.startTime);
+    const historicalVolumeRatio = averageHistoricalVolPerMin > 0
+      ? Number((candle.volume / averageHistoricalVolPerMin).toFixed(2))
+      : null;
+    const todayVolumeAccelerationRatio = todayAverageVolumePerMin > 0
+      ? Number((candle.volume / todayAverageVolumePerMin).toFixed(2))
+      : null;
+    const historicalVolumeConfirmed =
       averageHistoricalVolPerMin > 0 &&
-      candle.volume >= averageHistoricalVolPerMin * SIGNAL_CONFIG.volumeConfirmationMultiplier;
+      candle.volume >= averageHistoricalVolPerMin * SIGNAL_CONFIG.historicalVolumeConfirmationMultiplier;
+    const todayVolumeConfirmed =
+      todayVolumeSampleCount >= SIGNAL_CONFIG.minTodayVolumeSamples &&
+      todayAverageVolumePerMin > 0 &&
+      candle.volume >= todayAverageVolumePerMin * SIGNAL_CONFIG.todayVolumeAccelerationMultiplier;
+
+    let volumeConfirmed = historicalVolumeConfirmed;
+    if (SIGNAL_CONFIG.volumeConfirmationMode === "today") {
+      volumeConfirmed = todayVolumeConfirmed;
+    } else if (SIGNAL_CONFIG.volumeConfirmationMode === "both") {
+      volumeConfirmed = historicalVolumeConfirmed && todayVolumeConfirmed;
+    } else if (SIGNAL_CONFIG.volumeConfirmationMode === "either") {
+      volumeConfirmed = historicalVolumeConfirmed || todayVolumeConfirmed;
+    }
+
+    const enrichedInstrument = {
+      ...instrument,
+      todayAverageVolumePerMin,
+      todayVolumeAccelerationRatio,
+      historicalVolumeRatio
+    };
 
     // A signal is only actionable after both price expansion and volume confirmation.
     if (candle.close > breakoutLevel && volumeConfirmed) {
@@ -81,7 +169,7 @@ class SignalEngine {
       }
 
       const signal = this.createSignal({
-        instrument,
+        instrument: enrichedInstrument,
         side: "LONG",
         breakoutLevel,
         supportLevel,
@@ -111,7 +199,7 @@ class SignalEngine {
       }
 
       const signal = this.createSignal({
-        instrument,
+        instrument: enrichedInstrument,
         side: "SHORT",
         breakoutLevel,
         supportLevel,

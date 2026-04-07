@@ -19,7 +19,7 @@ function createSignal() {
     symbol: "SBIN",
     side: "LONG",
     close: 100,
-    timestamp: "2026-04-05 09:20"
+    timestamp: "2026-04-05 10:00"
   };
 }
 
@@ -28,7 +28,7 @@ function createShortSignal() {
     symbol: "SBIN",
     side: "SHORT",
     close: 100,
-    timestamp: "2026-04-05 09:20"
+    timestamp: "2026-04-05 10:00"
   };
 }
 
@@ -121,4 +121,21 @@ test("risk control blocks new entries after session cutoff", () => {
 
   assert.equal(result.approved, false);
   assert.equal(result.reason, "entry-cutoff-passed");
+});
+
+test("risk control blocks new entries before session start gate", () => {
+  const engine = new RiskControlEngine();
+  const result = engine.validateSignal({
+    signal: {
+      ...createSignal(),
+      timestamp: "2026-04-05 09:49:00"
+    },
+    openPositions: [],
+    marketTrend: "up",
+    riskConfig: createRiskConfig(),
+    allTrades: []
+  });
+
+  assert.equal(result.approved, false);
+  assert.equal(result.reason, "entry-start-not-reached");
 });

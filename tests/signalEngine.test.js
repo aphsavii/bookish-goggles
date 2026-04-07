@@ -25,6 +25,7 @@ test("signal engine emits breakout signal with volume confirmation", () => {
   assert.equal(signal.symbol, "SBIN");
   assert.equal(signal.side, "LONG");
   assert.equal(signal.breakoutLevel, 105);
+  assert.equal(signal.historicalVolumeRatio, 3);
 });
 
 test("signal engine suppresses duplicate breakout signals inside cooldown window", () => {
@@ -182,4 +183,32 @@ test("signal engine suppresses short signal when same-symbol short position is a
   });
 
   assert.equal(signal, null);
+});
+
+test("signal engine can confirm breakout from today's running average even when historical baseline is missing", () => {
+  const engine = new SignalEngine();
+  const signal = engine.evaluateBreakout({
+    candle: {
+      close: 110,
+      volume: 180,
+      startTime: "2026-04-05T10:00:00+05:30"
+    },
+    previousCandles: [
+      { high: 100, low: 95, volume: 100, startTime: "2026-04-05T09:55:00+05:30" },
+      { high: 103, low: 96, volume: 110, startTime: "2026-04-05T09:56:00+05:30" },
+      { high: 105, low: 98, volume: 120, startTime: "2026-04-05T09:57:00+05:30" },
+      { high: 104, low: 99, volume: 115, startTime: "2026-04-05T09:58:00+05:30" },
+      { high: 104.5, low: 99.5, volume: 105, startTime: "2026-04-05T09:59:00+05:30" }
+    ],
+    instrument: {
+      symbol: "SBIN",
+      averageHistoricalVolPerMin: 0
+    }
+  });
+
+  assert.ok(signal);
+  assert.equal(signal.side, "LONG");
+  assert.equal(signal.todayAverageVolumePerMin, 110);
+  assert.equal(signal.todayVolumeAccelerationRatio, 1.64);
+  assert.equal(signal.historicalVolumeRatio, null);
 });

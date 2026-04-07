@@ -35,6 +35,10 @@ class RiskControlEngine {
       return { approved: false, reason: "invalid-stop-loss" };
     }
 
+    if (!isIstTimeOnOrAfter(SESSION_CONFIG.noNewEntriesBefore, signalTimestamp)) {
+      return { approved: false, reason: "entry-start-not-reached" };
+    }
+
     if (isIstTimeOnOrAfter(SESSION_CONFIG.noNewEntriesAfter, signalTimestamp)) {
       return { approved: false, reason: "entry-cutoff-passed" };
     }

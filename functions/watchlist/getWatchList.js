@@ -9,11 +9,18 @@ const getWatchList = async () => {
     minPrice: WATCHLIST_CONFIG.minPrice,
     maxPrice: WATCHLIST_CONFIG.maxPrice
   });
+
+  if (!step1 || step1.error) {
+    throw new Error(
+      `Watchlist fetch failed${step1?.message ? `: ${step1.message}` : ""}`
+    );
+  }
+
   const step2 = filterOnGapPct(step1);
   const step3 = filterByValue(step2);
   const topWatchlist = step3.slice(0, WATCHLIST_CONFIG.maxInstruments);
   const enrichedWatchlist = await addAverageHistoricalVolPerMin(topWatchlist);
-  
+
   return enrichedWatchlist;
 };
 
