@@ -2,7 +2,8 @@ import { ensureNeoHsLibLoaded } from "./neoHslibLoader.js";
 
 const DEFAULT_SOCKET_URL = "wss://mlhsm.kotaksecurities.com";
 const DEFAULT_CHANNEL = 1;
-const HANDSHAKE_SETTLE_MS = 1000;
+const HANDSHAKE_SETTLE_MS = 500;
+const HEARTBEAT_INTERVAL_MS = 30000;
 
 function normalizeScrips(input) {
   if (!input) {
@@ -36,6 +37,8 @@ export class LiveFeedClient {
     this.url = url;
     this.channelNumber = channelNumber;
     this.socket = null;
+    this.isConnecting = false;
+    this.heartbeatTimer = null;
     this.subscriptions = new Map();
     this.handlers = {
       open: new Set(),
@@ -65,10 +68,34 @@ export class LiveFeedClient {
     return this.socket?.readyState === 1;
   }
 
+  startHeartbeat() {
+    this.stopHeartbeat();
+
+    this.heartbeatTimer = setInterval(() => {
+      if (!this.isConnected()) {
+        return;
+      }
+
+      this.socket.send(JSON.stringify({
+        type: "ti",
+        scrips: ""
+      }));
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
   connect() {
-    if (this.isConnected()) {
+    if (this.isConnected() || this.isConnecting) {
       return this.socket;
     }
+
+    this.isConnecting = true;
 
     try {
       const HSWebSocket = ensureNeoHsLibLoaded();
@@ -83,16 +110,20 @@ export class LiveFeedClient {
         throw new Error("Failed to create HSWebSocket instance");
       }
     } catch (error) {
+      this.isConnecting = false;
       throw new Error(`Socket setup failed: ${error.message}`);
     }
 
     this.socket.onopen = () => {
+      this.isConnecting = false;
+
       this.socket.send(JSON.stringify({
         Authorization: this.token,
         Sid: this.sid,
         type: "cn"
       }));
 
+      this.startHeartbeat();
       this.emit("open");
 
       setTimeout(() => {
@@ -111,10 +142,14 @@ export class LiveFeedClient {
     };
 
     this.socket.onerror = (event) => {
+      this.isConnecting = false;
       this.emit("error", event);
     };
 
     this.socket.onclose = (event) => {
+      this.isConnecting = false;
+      this.stopHeartbeat();
+      this.socket = null;
       this.emit("close", event);
     };
 
@@ -122,9 +157,14 @@ export class LiveFeedClient {
   }
 
   disconnect(code = 1000, reason = "Client disconnect") {
+    this.stopHeartbeat();
+
     if (this.socket && this.socket.readyState < 2) {
       this.socket.close(code, reason);
     }
+
+    this.socket = null;
+    this.isConnecting = false;
   }
 
   subscribe(type, scrips, channelNumber = this.channelNumber) {

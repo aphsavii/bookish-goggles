@@ -2,7 +2,10 @@
   "type": "module",
   "scripts": {
     "start": "node --env-file=.env index.js",
-    "dev": "nodemon --env-file=.env index.js"
+    "dev": "nodemon --env-file=.env index.js",
+    "test": "set NODE_ENV=test&& node --test",
+    "backtest:sample": "node --env-file=.env -e \"import('./functions/backtest/backtestRunner.js').then(async ({runBacktest}) => { const result = await runBacktest({ symbol: 'SBIN', symbolToken: '3045', fromDate: '2026-04-05 09:15', toDate: '2026-04-05 15:30', averageHistoricalVolPerMin: 100 }); console.log(JSON.stringify({ metrics: result.metrics, trades: result.trades.slice(0, 5), signals: result.signals.length, rejections: result.rejections.length }, null, 2)); }).catch((error) => { console.error(error); process.exit(1); })\"",
+    "backtest:integration": "node --env-file=.env ./scripts/runBacktestIntegration.js"
   },
   "dependencies": {
     "@valkey/valkey-glide": "^2.3.0",
@@ -13,7 +16,6 @@
     "https": "^1.0.0",
     "ioredis": "^5.10.1",
     "nodemon": "^3.0.1",
-    "pg": "^8.20.0",
     "socket.io-client": "^4.8.3",
     "ws": "^8.20.0"
   },

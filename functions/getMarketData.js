@@ -1,3 +1,0 @@
-const getMarketBias = async (ticker) => {
-    
-}

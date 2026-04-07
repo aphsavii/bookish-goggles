@@ -1,9 +1,8 @@
-import fs from 'fs';
+import fs from "fs";
 
 const getExchToken = (symbol) => {
-    const data = JSON.parse(fs.readFileSync("data/scripMaster.json"));
-    return data[symbol];
-}
+  const data = JSON.parse(fs.readFileSync("data/scripMaster.json"));
+  return data[symbol];
+};
 
-
-export  {getExchToken};
+export { getExchToken };

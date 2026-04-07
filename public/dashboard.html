@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade Dashboard v2</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #151b23;
+      --panel-2: #1d2632;
+      --line: #2a3441;
+      --text: #e6edf3;
+      --muted: #9aa7b5;
+      --up: #1db954;
+      --down: #e5534b;
+      --flat: #d4a72c;
+      --accent: #4ea1ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top right, rgba(78, 161, 255, 0.18), transparent 30%),
+        radial-gradient(circle at top left, rgba(29, 185, 84, 0.12), transparent 25%),
+        var(--bg);
+      color: var(--text);
+      font: 14px/1.4 "Segoe UI", sans-serif;
+    }
+
+    h1, h2, h3 {
+      margin: 0 0 12px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 16px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge.up { background: rgba(29, 185, 84, 0.15); color: var(--up); }
+    .badge.down { background: rgba(229, 83, 75, 0.15); color: var(--down); }
+    .badge.flat { background: rgba(212, 167, 44, 0.15); color: var(--flat); }
+
+    .watchlist-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .watchlist-table th,
+    .watchlist-table td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .watchlist-table tr:hover {
+      background: rgba(255,255,255,0.03);
+      cursor: pointer;
+    }
+
+    .watchlist-table tr.active {
+      background: rgba(78, 161, 255, 0.12);
+    }
+
+    .candles {
+      display: flex;
+      align-items: end;
+      gap: 6px;
+      height: 220px;
+      padding-top: 16px;
+    }
+
+    .candle {
+      flex: 1;
+      min-width: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .wick {
+      width: 2px;
+      background: var(--muted);
+      opacity: 0.8;
+    }
+
+    .body {
+      width: 100%;
+      border-radius: 4px;
+      min-height: 6px;
+    }
+
+    .body.up { background: var(--up); }
+    .body.down { background: var(--down); }
+    .body.flat { background: var(--flat); }
+
+    .candle-label {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .cards {
+      display: grid;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 12px;
+      font-size: 13px;
+    }
+
+    .kv span:nth-child(odd) {
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--accent);
+      font-size: 12px;
+    }
+
+    @media (max-width: 1100px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+
+      .top-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-grid">
+    <section class="panel">
+      <h1>Live Watchlist v2</h1>
+      <div class="meta" id="watchlist-meta">Waiting for data...</div>
+      <table class="watchlist-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>LTP</th>
+            <th>VWAP</th>
+            <th>Gap %</th>
+            <th>PChange</th>
+            <th>Avg Hist Vol/Min</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody id="watchlist-body"></tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h1>Nifty 50</h1>
+      <div id="nifty-card" class="cards"></div>
+    </section>
+  </div>
+
+  <div class="top-grid">
+    <section class="panel">
+      <h2>Risk Control</h2>
+      <div id="risk-card" class="cards"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Feed Health</h2>
+      <div id="feed-health" class="cards"></div>
+    </section>
+  </div>
+
+  <div class="top-grid">
+    <section class="panel">
+      <h2>Open Positions</h2>
+      <div id="positions" class="cards"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Closed Trades</h2>
+      <div id="closed-trades" class="cards"></div>
+    </section>
+  </div>
+
+  <div class="dashboard">
+    <section class="panel">
+      <h2 id="candles-title">1 Minute Candles</h2>
+      <div class="meta" id="candles-meta">Select a symbol from watchlist</div>
+      <div id="candles" class="candles"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Signals</h2>
+      <div id="signals" class="cards"></div>
+
+      <h2 style="margin-top: 18px;">Paper Trades</h2>
+      <div id="trades" class="cards"></div>
+    </section>
+  </div>
+
+  <script>
+    let selectedSymbol = null;
+
+    function formatNumber(value, digits = 2) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return "-";
+      }
+      return Number(value).toFixed(digits);
+    }
+
+    function formatTrendBadge(trend = "flat") {
+      return `<span class="badge ${trend}">${trend}</span>`;
+    }
+
+    function renderWatchlist(watchlist) {
+      const body = document.getElementById("watchlist-body");
+      const meta = document.getElementById("watchlist-meta");
+      body.innerHTML = "";
+      meta.textContent = `${watchlist.length} instruments tracked`;
+
+      if (!selectedSymbol && watchlist.length > 0) {
+        selectedSymbol = watchlist[0].symbol;
+      }
+
+      for (const item of watchlist) {
+        const row = document.createElement("tr");
+        if (item.symbol === selectedSymbol) {
+          row.classList.add("active");
+        }
+        row.onclick = () => {
+          selectedSymbol = item.symbol;
+          refresh();
+        };
+
+        row.innerHTML = `
+          <td>${item.symbol}</td>
+          <td>${formatNumber(item.ltp)}</td>
+          <td>${formatNumber(item.vwap)}</td>
+          <td>${formatNumber(item.gapPct)}</td>
+          <td>${formatNumber(item.pChange)}</td>
+          <td>${formatNumber(item.averageHistoricalVolPerMin)}</td>
+          <td>${item.lastUpdated ?? "-"}</td>
+        `;
+        body.appendChild(row);
+      }
+    }
+
+    function renderNifty(nifty) {
+      const container = document.getElementById("nifty-card");
+      if (!nifty) {
+        container.innerHTML = `<div class="card">Waiting for Nifty feed...</div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong>${nifty.symbol}</strong>
+            ${formatTrendBadge(nifty.trend)}
+          </div>
+          <div class="kv">
+            <span>Value</span><span>${formatNumber(nifty.value)}</span>
+            <span>Previous Close</span><span>${formatNumber(nifty.previousClose)}</span>
+            <span>Change</span><span>${formatNumber(nifty.change)}</span>
+            <span>Open</span><span>${formatNumber(nifty.open)}</span>
+            <span>High</span><span>${formatNumber(nifty.high)}</span>
+            <span>Low</span><span>${formatNumber(nifty.low)}</span>
+            <span>Updated</span><span>${nifty.lastUpdated ?? "-"}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderRisk(risk) {
+      const container = document.getElementById("risk-card");
+      if (!risk) {
+        container.innerHTML = `<div class="card">Risk configuration unavailable.</div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="card">
+          <div class="kv">
+            <span>Total Margin</span><span>${formatNumber(risk.totalMarginAvailable)}</span>
+            <span>Available Margin</span><span>${formatNumber(risk.availableMargin)}</span>
+            <span>Allocated Margin</span><span>${formatNumber(risk.allocatedMargin)}</span>
+            <span>Max Margin/Trade</span><span>${formatNumber(risk.maxMarginPerTrade)}</span>
+            <span>Max Trades/Day</span><span>${risk.maxTradesPerDay ?? "-"}</span>
+            <span>Max Loss/Trade</span><span>${formatNumber(risk.maxLossPerTrade)}</span>
+            <span>Max Loss/Day</span><span>${formatNumber(risk.maxLossPerDay)}</span>
+            <span>Realized PnL</span><span>${formatNumber(risk.realizedPnl)}</span>
+            <span>Unrealized PnL</span><span>${formatNumber(risk.unrealizedPnl)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFeedHealth(feedHealth) {
+      const container = document.getElementById("feed-health");
+      if (!feedHealth) {
+        container.innerHTML = `<div class="card">Feed health unavailable.</div>`;
+        return;
+      }
+
+      const trend = feedHealth.status === "healthy" ? "up" : feedHealth.status === "stale" ? "flat" : "down";
+
+      container.innerHTML = `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong>Websocket</strong>
+            ${formatTrendBadge(trend)}
+          </div>
+          <div class="kv">
+            <span>Status</span><span>${feedHealth.status}</span>
+            <span>Connected</span><span>${feedHealth.connected ? "Yes" : "No"}</span>
+            <span>Last Message</span><span>${feedHealth.lastMessageAt ?? "-"}</span>
+            <span>Last Activity</span><span>${feedHealth.lastActivityAt ?? "-"}</span>
+            <span>Reconnect Attempts</span><span>${feedHealth.reconnectAttempts ?? 0}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCandles(symbol, candles) {
+      const container = document.getElementById("candles");
+      const title = document.getElementById("candles-title");
+      const meta = document.getElementById("candles-meta");
+      title.textContent = `1 Minute Candles${symbol ? ` · ${symbol}` : ""}`;
+
+      if (!candles || candles.length === 0) {
+        container.innerHTML = "";
+        meta.textContent = "No closed candles yet for the selected symbol.";
+        return;
+      }
+
+      meta.textContent = `${candles.length} candles`;
+      const recent = candles.slice(-12);
+      const maxHigh = Math.max(...recent.map((c) => c.high));
+      const minLow = Math.min(...recent.map((c) => c.low));
+      const range = Math.max(maxHigh - minLow, 0.01);
+
+      container.innerHTML = recent.map((candle) => {
+        const wickHeight = ((candle.high - candle.low) / range) * 160 + 20;
+        const bodyHeight = (Math.abs(candle.close - candle.open) / range) * 120 + 6;
+        const trend = candle.close > candle.open ? "up" : candle.close < candle.open ? "down" : "flat";
+        const label = candle.bucket?.slice(-5) ?? "";
+
+        return `
+          <div class="candle">
+            <div class="wick" style="height:${wickHeight}px;"></div>
+            <div class="body ${trend}" style="height:${bodyHeight}px;" title="O:${candle.open} H:${candle.high} L:${candle.low} C:${candle.close} V:${candle.volume}"></div>
+            <div class="candle-label">${label}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderCards(containerId, items, emptyText, mapper) {
+      const container = document.getElementById(containerId);
+      if (!items || items.length === 0) {
+        container.innerHTML = `<div class="card">${emptyText}</div>`;
+        return;
+      }
+
+      container.innerHTML = items.map(mapper).join("");
+    }
+
+    async function refresh() {
+      const res = await fetch("/api/dashboard");
+      const data = await res.json();
+
+      renderWatchlist(data.watchlist ?? []);
+      renderNifty(data.nifty50);
+      renderRisk(data.risk);
+      renderFeedHealth(data.feedHealth);
+      renderCandles(selectedSymbol, data.candles?.[selectedSymbol] ?? []);
+
+      renderCards("positions", data.positions ?? [], "No open positions.", (position) => `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>${position.symbol}</strong>
+            <span class="pill">${position.status}</span>
+          </div>
+          <div class="kv">
+            <span>Side</span><span>${position.side}</span>
+            <span>Entry</span><span>${formatNumber(position.entry)}</span>
+            <span>Stop Loss</span><span>${formatNumber(position.stopLoss)}</span>
+            <span>Quantity</span><span>${position.quantity ?? "-"}</span>
+            <span>Risk Amount</span><span>${formatNumber(position.riskAmount)}</span>
+            <span>Allocated Margin</span><span>${formatNumber(position.allocatedMargin)}</span>
+            <span>Target</span><span>${formatNumber(position.target)}</span>
+            <span>Current Price</span><span>${formatNumber(position.currentPrice)}</span>
+            <span>Unrealized PnL</span><span>${formatNumber(position.unrealizedPnl)}</span>
+            <span>Timestamp</span><span>${position.timestamp}</span>
+          </div>
+        </div>
+      `);
+
+      renderCards("closed-trades", (data.trades ?? []).filter((trade) => trade.status === "CLOSED"), "No closed trades yet.", (trade) => `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>${trade.symbol}</strong>
+            <span class="pill">${trade.closedReason ?? trade.status}</span>
+          </div>
+          <div class="kv">
+            <span>Entry</span><span>${formatNumber(trade.entry)}</span>
+            <span>Requested Exit</span><span>${formatNumber(trade.requestedExitPrice)}</span>
+            <span>Exit</span><span>${formatNumber(trade.exitPrice)}</span>
+            <span>PnL</span><span>${formatNumber(trade.pnl)}</span>
+            <span>Exit Time</span><span>${trade.exitTimestamp ?? "-"}</span>
+          </div>
+        </div>
+      `);
+
+      renderCards("signals", data.signals ?? [], "No signals yet.", (signal) => `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>${signal.symbol}</strong>
+            <span class="pill">${signal.side}</span>
+          </div>
+          <div class="kv">
+            <span>Strategy</span><span>${signal.strategy}</span>
+            <span>Breakout</span><span>${formatNumber(signal.breakoutLevel)}</span>
+            <span>Close</span><span>${formatNumber(signal.close)}</span>
+            <span>Candle Vol</span><span>${formatNumber(signal.candleVolume)}</span>
+            <span>Avg Hist Vol/Min</span><span>${formatNumber(signal.averageHistoricalVolPerMin)}</span>
+            <span>Timestamp</span><span>${signal.timestamp}</span>
+          </div>
+        </div>
+      `);
+
+      renderCards("trades", data.trades ?? [], "No paper trades yet.", (trade) => `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>${trade.symbol}</strong>
+            <span class="pill">${trade.status}</span>
+          </div>
+          <div class="kv">
+            <span>Side</span><span>${trade.side}</span>
+            <span>Entry</span><span>${formatNumber(trade.entry)}</span>
+            <span>Requested Entry</span><span>${formatNumber(trade.requestedEntry)}</span>
+            <span>Stop Loss</span><span>${formatNumber(trade.stopLoss)}</span>
+            <span>Target</span><span>${formatNumber(trade.target)}</span>
+            <span>Allocated Margin</span><span>${formatNumber(trade.allocatedMargin)}</span>
+            <span>PnL</span><span>${formatNumber(trade.pnl)}</span>
+            <span>Strategy</span><span>${trade.strategy}</span>
+            <span>Timestamp</span><span>${trade.timestamp}</span>
+          </div>
+        </div>
+      `);
+    }
+
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>

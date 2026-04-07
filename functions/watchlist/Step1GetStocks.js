@@ -36,10 +36,10 @@ export async function fetchAndProcessStocks(filters = {}) {
         open: parseFloat(data.open),
         high: parseFloat(data.dayHigh),
         low: parseFloat(data.dayLow),
-        close: ltp,
-
+        prevClose: parseFloat(data.previousClose),
         ltp: ltp,
         pChange: Number(data.pChange),
+        gapPct : parseFloat(((data.open-data.previousClose)/data.previousClose)*100),
 
         volume: Number(data.totalTradedVolume),
         tradedValue: Number(data.totalTradedValue)

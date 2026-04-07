@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategy Backtest</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #121a2b;
+      --panel-2: #1a2438;
+      --line: #2a3852;
+      --text: #e6edf7;
+      --muted: #94a3b8;
+      --up: #16a34a;
+      --down: #dc2626;
+      --accent: #38bdf8;
+      --warn: #f59e0b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 30%),
+        radial-gradient(circle at top right, rgba(245, 158, 11, 0.1), transparent 30%),
+        var(--bg);
+      color: var(--text);
+      font: 14px/1.45 "Segoe UI", sans-serif;
+    }
+
+    h1, h2 { margin: 0 0 12px; }
+
+    .layout {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 16px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    input, select, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+
+    button {
+      background: linear-gradient(135deg, rgba(56,189,248,0.18), rgba(56,189,248,0.05));
+      border-color: rgba(56,189,248,0.35);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .card .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .card .value {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .value.up { color: var(--up); }
+    .value.down { color: var(--down); }
+    .value.warn { color: var(--warn); }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table th, .table td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .curve {
+      display: flex;
+      align-items: end;
+      gap: 6px;
+      height: 220px;
+      margin-top: 12px;
+    }
+
+    .curve-bar {
+      flex: 1;
+      min-width: 16px;
+      border-radius: 6px 6px 0 0;
+      background: linear-gradient(180deg, rgba(56,189,248,0.9), rgba(56,189,248,0.25));
+    }
+
+    .curve-bar.down {
+      background: linear-gradient(180deg, rgba(220,38,38,0.9), rgba(220,38,38,0.25));
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 24px 0;
+    }
+
+    .error {
+      color: #fecaca;
+      background: rgba(127, 29, 29, 0.35);
+      border: 1px solid rgba(248, 113, 113, 0.4);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    @media (max-width: 1100px) {
+      .grid-2, .form-grid, .cards {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <section class="panel">
+      <h1>Strategy Backtest</h1>
+      <div class="meta">Runs separately from the live engine. Signals are generated on candle close and entered on the next candle open.</div>
+      <form id="backtest-form" style="margin-top:16px;">
+        <div class="form-grid">
+          <label>
+            Symbol
+            <input name="symbol" value="SBIN" required />
+          </label>
+          <label>
+            Symbol Token
+            <input name="symbolToken" value="3045" required />
+          </label>
+          <label>
+            Market Trend
+            <select name="marketTrend">
+              <option value="up" selected>up</option>
+              <option value="flat">flat</option>
+              <option value="down">down</option>
+            </select>
+          </label>
+          <label>
+            From DateTime
+            <input name="fromDate" value="2026-04-05 09:15" required />
+          </label>
+          <label>
+            To DateTime
+            <input name="toDate" value="2026-04-05 15:30" required />
+          </label>
+          <label>
+            Avg Hist Vol/Min
+            <input name="averageHistoricalVolPerMin" type="number" step="0.01" value="100" />
+          </label>
+        </div>
+        <div style="margin-top:12px;">
+          <button type="submit">Run Backtest</button>
+        </div>
+      </form>
+      <div id="status" class="meta" style="margin-top:12px;">Ready.</div>
+      <div id="error" style="margin-top:12px;"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Metrics</h2>
+      <div id="metrics" class="cards"></div>
+    </section>
+
+    <div class="grid-2">
+      <section class="panel">
+        <h2>Equity Curve</h2>
+        <div class="meta" id="equity-meta">No backtest run yet.</div>
+        <div id="equity-curve" class="curve"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Run Summary</h2>
+        <div id="summary" class="cards"></div>
+      </section>
+    </div>
+
+    <div class="grid-2">
+      <section class="panel">
+        <h2>Trades</h2>
+        <div style="overflow:auto;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>Qty</th>
+                <th>PnL</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody id="trades-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Signals & Rejections</h2>
+        <div style="overflow:auto;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Time</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody id="events-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    function formatNumber(value, digits = 2) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return "-";
+      }
+      return Number(value).toFixed(digits);
+    }
+
+    function setStatus(text) {
+      document.getElementById("status").textContent = text;
+    }
+
+    function setError(message = "") {
+      const target = document.getElementById("error");
+      target.innerHTML = message ? `<div class="error">${message}</div>` : "";
+    }
+
+    function renderMetrics(metrics) {
+      const target = document.getElementById("metrics");
+      if (!metrics) {
+        target.innerHTML = `<div class="empty">No metrics yet.</div>`;
+        return;
+      }
+
+      const cards = [
+        ["Net PnL", metrics.netPnl, metrics.netPnl >= 0 ? "up" : "down"],
+        ["Win Rate %", metrics.winRate, metrics.winRate >= 50 ? "up" : "warn"],
+        ["Total Trades", metrics.totalTrades, ""],
+        ["Max Drawdown", metrics.maxDrawdown, "down"],
+        ["Gross Profit", metrics.grossProfit, "up"],
+        ["Gross Loss", metrics.grossLoss, "down"],
+        ["Profit Factor", metrics.profitFactor ?? "-", metrics.profitFactor >= 1 ? "up" : "warn"],
+        ["Avg Win / Loss", `${formatNumber(metrics.averageWin)} / ${formatNumber(metrics.averageLoss)}`, ""]
+      ];
+
+      target.innerHTML = cards.map(([label, value, cls]) => `
+        <div class="card">
+          <div class="label">${label}</div>
+          <div class="value ${cls}">${typeof value === "number" ? formatNumber(value) : value}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderSummary(result) {
+      const target = document.getElementById("summary");
+      if (!result) {
+        target.innerHTML = `<div class="empty">No run summary yet.</div>`;
+        return;
+      }
+
+      target.innerHTML = `
+        <div class="card">
+          <div class="label">Symbol</div>
+          <div class="value">${result.symbol}</div>
+        </div>
+        <div class="card">
+          <div class="label">Candle Count</div>
+          <div class="value">${result.candles?.length ?? 0}</div>
+        </div>
+        <div class="card">
+          <div class="label">Signals</div>
+          <div class="value">${result.signals?.length ?? 0}</div>
+        </div>
+        <div class="card">
+          <div class="label">Rejections</div>
+          <div class="value">${result.rejections?.length ?? 0}</div>
+        </div>
+      `;
+    }
+
+    function renderEquityCurve(metrics) {
+      const target = document.getElementById("equity-curve");
+      const meta = document.getElementById("equity-meta");
+      const curve = metrics?.equityCurve ?? [];
+
+      if (curve.length === 0) {
+        target.innerHTML = "";
+        meta.textContent = "No closed trades yet for this run.";
+        return;
+      }
+
+      meta.textContent = `${curve.length} closed-trade points`;
+      const values = curve.map((point) => point.equity);
+      const max = Math.max(...values, 0.01);
+      const min = Math.min(...values, 0);
+      const range = Math.max(max - min, 0.01);
+
+      target.innerHTML = curve.map((point) => {
+        const height = ((point.equity - min) / range) * 180 + 12;
+        const cls = point.equity >= 0 ? "" : "down";
+        return `<div class="curve-bar ${cls}" title="${point.timestamp} | ${formatNumber(point.equity)}" style="height:${height}px;"></div>`;
+      }).join("");
+    }
+
+    function renderTrades(trades = []) {
+      const target = document.getElementById("trades-body");
+      const rows = trades.filter((trade) => trade.status === "CLOSED");
+
+      if (rows.length === 0) {
+        target.innerHTML = `<tr><td colspan="6" class="empty">No closed trades.</td></tr>`;
+        return;
+      }
+
+      target.innerHTML = rows.map((trade) => `
+        <tr>
+          <td>${trade.timestamp}</td>
+          <td>${formatNumber(trade.entry)}</td>
+          <td>${formatNumber(trade.exitPrice)}</td>
+          <td>${trade.quantity}</td>
+          <td>${formatNumber(trade.pnl)}</td>
+          <td>${trade.closedReason ?? "-"}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderEvents(result) {
+      const target = document.getElementById("events-body");
+      const signalRows = (result.signals ?? []).map((signal) => ({
+        type: "signal",
+        timestamp: signal.timestamp,
+        detail: `${signal.symbol} breakout ${formatNumber(signal.breakoutLevel)}`
+      }));
+      const rejectionRows = (result.rejections ?? []).map((item) => ({
+        type: "rejection",
+        timestamp: item.timestamp,
+        detail: item.reason
+      }));
+      const rows = [...signalRows, ...rejectionRows].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+      if (rows.length === 0) {
+        target.innerHTML = `<tr><td colspan="3" class="empty">No signals or rejections.</td></tr>`;
+        return;
+      }
+
+      target.innerHTML = rows.map((row) => `
+        <tr>
+          <td>${row.type}</td>
+          <td>${row.timestamp}</td>
+          <td>${row.detail}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function runBacktest(formData) {
+      const params = new URLSearchParams(formData);
+      const response = await fetch(`/api/backtest?${params.toString()}`);
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Backtest failed");
+      }
+
+      return payload;
+    }
+
+    document.getElementById("backtest-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setError("");
+      setStatus("Running backtest...");
+
+      try {
+        const form = new FormData(event.currentTarget);
+        const result = await runBacktest(form);
+        renderMetrics(result.metrics);
+        renderSummary(result);
+        renderEquityCurve(result.metrics);
+        renderTrades(result.trades);
+        renderEvents(result);
+        setStatus(`Completed for ${result.symbol}. Trades: ${result.metrics.totalTrades}, Net PnL: ${formatNumber(result.metrics.netPnl)}`);
+      } catch (error) {
+        setError(error.message);
+        setStatus("Backtest failed.");
+      }
+    });
+
+    renderMetrics(null);
+    renderSummary(null);
+    renderEquityCurve(null);
+    renderTrades([]);
+    renderEvents({ signals: [], rejections: [] });
+  </script>
+</body>
+</html>

@@ -1,17 +1,6 @@
-node:internal/event_target:1122
-  process.nextTick(() => { throw err; });
-                           ^
-
-TypeError: Cannot read properties of undefined (reading 'code')
-    at file:///C:/Users/AvinashKumar/Desktop/trade/liveDataHandler.js:18:45
-    at LiveFeedClient.emit (file:///C:/Users/AvinashKumar/Desktop/trade/socketConnection.js:60:7)
-    at socket.onclose (file:///C:/Users/AvinashKumar/Desktop/trade/socketConnection.js:105:12)
-    at ws.onclose (C:\Users\AvinashKumar\Desktop\trade\vendor\neo-hslib.js:1:26162)
-    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:845:20)
-    at WebSocket.dispatchEvent (node:internal/event_target:778:26)
-    at fireEvent (node:internal/deps/undici/undici:11855:14)
-    at TLSSocket.onSocketClose (node:internal/deps/undici/undici:12254:7)
-    at TLSSocket.emit (node:events:531:35)
-    at node:net:346:12
-
-Node.js v22.22.0
+(node:37440) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Socket closed: code=unknown, reason=none
+Socket reconnect scheduled in 500ms (close:unknown)
+Socket closed: code=unknown, reason=none
+Socket reconnect scheduled in 500ms (close:unknown)
