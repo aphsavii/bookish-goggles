@@ -85,18 +85,42 @@ async function fetchHistoricalTradeData(symbol, {
     new Date(new Date().setDate(new Date().getDate() - 10))
   );
 
-  const uri = `https://www.nseindia.com/api/NextApi/apiClient/GetQuoteApi?functionName=getHistoricalTradeData&symbol=${symbol}&series=${series}&fromDate=${resolvedFromDate}&toDate=${resolvedToDate}`;
+  const uri = `https://nameless-hat-8a61.aphsavii.workers.dev/api/historical-data?symbol=${symbol}&series=${series}&fromDate=${resolvedFromDate}&toDate=${resolvedToDate}`;
 
-  const response = await axios.get(uri, {
-    headers: {
-      "User-Agent": "Mozilla/5.0",
-      "Accept": "application/json",
-      "Referer": "https://www.nseindia.com/",
-      "Connection": "keep-alive"
+  const maxRetries = 3;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await axios.get(uri, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json",
+          "Connection": "keep-alive",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache"
+        },
+        timeout: 10000
+      });
+
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      lastError = error;
+      console.warn(`[Market Data] Attempt ${attempt}/${maxRetries} failed for ${symbol}: ${error.message}`);
+      
+      if (attempt < maxRetries) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delayMs = Math.pow(2, attempt - 1) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
     }
-  });
+  }
 
-  return Array.isArray(response.data) ? response.data : [];
+  console.error(`[Market Data] Failed to fetch data for ${symbol} after ${maxRetries} attempts:`, lastError.message);
+  
+  // Return empty array as graceful fallback - allows app to start without this data
+  // averageHistoricalVolPerMin will default to 0
+  return [];
 }
 
 export async function getMarketData(watchlist = [], options = {}) {

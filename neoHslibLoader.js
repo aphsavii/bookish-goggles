@@ -2,7 +2,6 @@ import fs from "fs";
 import path from "path";
 import vm from "vm";
 import { fileURLToPath } from "url";
-import WebSocket from "ws";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,15 +17,6 @@ export function ensureNeoHsLibLoaded() {
   // Validate file exists before attempting to load
   if (!fs.existsSync(HSLIB_PATH)) {
     throw new Error(`Neo HSLib file not found at: ${HSLIB_PATH}`);
-  }
-
-  // Provide WebSocket to global scope before loading the library
-  if (typeof globalThis.WebSocket === "undefined") {
-    globalThis.WebSocket = WebSocket;
-  }
-
-  if (typeof globalThis.MozWebSocket === "undefined") {
-    globalThis.MozWebSocket = WebSocket;
   }
 
   if (typeof globalThis.window === "undefined") {
