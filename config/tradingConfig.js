@@ -7,7 +7,7 @@ export const WATCHLIST_CONFIG = {
 export const RISK_CONFIG = {
   totalMarginAvailable: 100000,
   maxMarginPerTrade: 25000,
-  maxTradesPerDay: 5,
+  maxTradesPerDay: 15,
   maxLossPerTrade: 1000,
   maxLossPerDay: 3000,
   stopLossPct: 1,
