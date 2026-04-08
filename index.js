@@ -1,6 +1,7 @@
 import express from 'express';
 import { startApp } from './app.js';
 import { initializeDatabase } from './data/sqliteClient.js';
+import { getTradeEventDates, getTradeEvents } from './data/eventLogStore.js';
 import global from './data/global.js';
 import { runBacktest } from './functions/backtest/backtestRunner.js';
 import { executionEngine } from './functions/engines/executionEngine.js';
@@ -94,6 +95,30 @@ app.post("/api/positions/:symbol/close", (req, res) => {
 
 app.get("/api/dashboard", (_req, res) => {
     res.json(global.getStateSnapshot());
+});
+
+app.get("/api/logs", (req, res) => {
+    try {
+        const { date, symbol, eventType, tradeId, limit } = req.query;
+        res.json(getTradeEvents({
+            date: date ? String(date) : undefined,
+            symbol: symbol ? String(symbol) : undefined,
+            eventType: eventType ? String(eventType) : undefined,
+            tradeId: tradeId ? String(tradeId) : undefined,
+            limit: limit ? Number(limit) : undefined
+        }));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get("/api/logs/dates", (req, res) => {
+    try {
+        const { limit } = req.query;
+        res.json(getTradeEventDates(limit ? Number(limit) : undefined));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.get("/api/feed/raw", (_req, res) => {

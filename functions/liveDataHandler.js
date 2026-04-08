@@ -1,5 +1,6 @@
 import { getExchToken } from "../data/getData.js";
 import global from "../data/global.js";
+import { logTradeEvent } from "../data/eventLogStore.js";
 import { createLiveFeedClient } from "../socketConnection.js";
 import { candleEngine } from "./engines/candleEngine.js";
 import { signalEngine } from "./engines/signalEngine.js";
@@ -15,6 +16,7 @@ const isDebugFeedEnabled = process.env.DEBUG_FEED === "true";
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let manualStop = false;
+let lastFeedHealthStatus = "disconnected";
 const liveFeedState = {
   equities: new Map(),
   indices: new Map(),
@@ -78,6 +80,37 @@ function updateLiveFeedState(items) {
     if (liveFeedState.system.length > 50) {
       liveFeedState.system.shift();
     }
+  }
+}
+
+function setFeedHealth(feedHealth) {
+  global.setFeedHealth(feedHealth);
+  const nextStatus = {
+    ...global.getFeedHealth(),
+    ...feedHealth
+  }.status;
+
+  if (nextStatus && nextStatus !== lastFeedHealthStatus) {
+    logTradeEvent({
+      eventType: "feed-status-changed",
+      symbol: null,
+      side: null,
+      tradeId: null,
+      status: nextStatus,
+      payload: {
+        previousStatus: lastFeedHealthStatus,
+        nextStatus,
+        connected: {
+          ...global.getFeedHealth(),
+          ...feedHealth
+        }.connected ?? null,
+        reconnectAttempts: {
+          ...global.getFeedHealth(),
+          ...feedHealth
+        }.reconnectAttempts ?? reconnectAttempts
+      }
+    });
+    lastFeedHealthStatus = nextStatus;
   }
 }
 
@@ -147,6 +180,36 @@ function processTradingEngines(equityItems) {
       continue;
     }
 
+    logTradeEvent({
+      timestamp: signal.timestamp,
+      tradeDate: String(signal.timestamp).slice(0, 10),
+      eventType: "signal-generated",
+      symbol: signal.symbol,
+      side: signal.side,
+      status: "OPEN",
+      payload: {
+        strategy: signal.strategy,
+        signalModel: signal.signalModel,
+        setupType: signal.setupType,
+        marketTrend: global.getNifty50()?.trend ?? "flat",
+        breakoutLevel: signal.breakoutLevel,
+        supportLevel: signal.supportLevel,
+        triggerLevel: signal.triggerLevel,
+        breakoutBuffer: signal.breakoutBuffer,
+        effectiveLookback: signal.effectiveLookback,
+        atr: signal.atr,
+        close: signal.close,
+        candleVolume: signal.candleVolume,
+        averageHistoricalVolPerMin: signal.averageHistoricalVolPerMin,
+        todayAverageVolumePerMin: signal.todayAverageVolumePerMin,
+        timeOfDayAverageVolumePerMin: signal.timeOfDayAverageVolumePerMin,
+        historicalVolumeRatio: signal.historicalVolumeRatio,
+        todayVolumeAccelerationRatio: signal.todayVolumeAccelerationRatio,
+        timeOfDayVolumeRatio: signal.timeOfDayVolumeRatio,
+        volumeConfirmationBasis: signal.volumeConfirmationBasis
+      }
+    });
+
     const riskDecision = riskControlEngine.validateSignal({
       signal,
       openPositions: executionEngine.getOpenPositions(),
@@ -156,9 +219,47 @@ function processTradingEngines(equityItems) {
     });
 
     if (!riskDecision.approved) {
+      logTradeEvent({
+        timestamp: signal.timestamp,
+        tradeDate: String(signal.timestamp).slice(0, 10),
+        eventType: "risk-rejected",
+        symbol: signal.symbol,
+        side: signal.side,
+        status: "REJECTED",
+        payload: {
+          reason: riskDecision.reason,
+          stopLoss: riskDecision.stopLoss ?? null,
+          quantity: riskDecision.quantity ?? null,
+          riskAmount: riskDecision.riskAmount ?? null,
+          allocatedMargin: riskDecision.allocatedMargin ?? null,
+          maxLossPerTrade: riskDecision.maxLossPerTrade ?? null,
+          maxMarginPerTrade: riskDecision.maxMarginPerTrade ?? null,
+          expectedEntry: riskDecision.expectedEntry ?? null,
+          signal
+        }
+      });
       global.updateIntradayVolumeProfile(symbol, closedCandle);
       continue;
     }
+
+    logTradeEvent({
+      timestamp: signal.timestamp,
+      tradeDate: String(signal.timestamp).slice(0, 10),
+      eventType: "risk-approved",
+      symbol: signal.symbol,
+      side: signal.side,
+      status: "APPROVED",
+      payload: {
+        stopLoss: riskDecision.stopLoss,
+        quantity: riskDecision.quantity,
+        riskAmount: riskDecision.riskAmount,
+        allocatedMargin: riskDecision.allocatedMargin,
+        maxLossPerTrade: riskDecision.maxLossPerTrade,
+        maxMarginPerTrade: riskDecision.maxMarginPerTrade,
+        expectedEntry: riskDecision.expectedEntry,
+        signal
+      }
+    });
 
     const trade = executionEngine.execute({ signal, riskDecision });
 
@@ -191,6 +292,20 @@ function maybeAutoSquareOff() {
   if (closedTrades.length > 0) {
     global.setTrades(executionEngine.getPaperTrades());
     global.setPositions(executionEngine.getOpenPositions());
+    logTradeEvent({
+      eventType: "session-squareoff",
+      status: "COMPLETED",
+      payload: {
+        closedTrades: closedTrades.map((trade) => ({
+          tradeId: trade.tradeId,
+          symbol: trade.symbol,
+          side: trade.side,
+          exitPrice: trade.exitPrice,
+          pnl: trade.pnl,
+          closedReason: trade.closedReason
+        }))
+      }
+    });
     console.log(`Auto square-off executed for ${closedTrades.length} position(s)`);
   }
 }
@@ -245,7 +360,7 @@ function startHealthMonitoring() {
     const now = Date.now();
     const isStale = !lastMessageAt || (now - lastMessageAt) > LIVE_FEED_CONFIG.staleAfterMs;
 
-    global.setFeedHealth({
+    setFeedHealth({
       status: global.getFeedHealth().connected
         ? (isStale ? "stale" : "healthy")
         : "disconnected"
@@ -289,7 +404,7 @@ liveFeedClient.on("open", () => {
   clearReconnectTimer();
   reconnectAttempts = 0;
   const timestamp = new Date().toISOString();
-  global.setFeedHealth({
+  setFeedHealth({
     connected: true,
     status: "healthy",
     reconnectAttempts,
@@ -302,7 +417,7 @@ liveFeedClient.on("open", () => {
 liveFeedClient.on("parsed", (payload) => {
   const items = Array.isArray(payload) ? payload : [payload];
   const timestamp = new Date().toISOString();
-  global.setFeedHealth({
+  setFeedHealth({
     lastMessageAt: timestamp,
     lastActivityAt: timestamp,
     status: "healthy"
@@ -313,10 +428,11 @@ liveFeedClient.on("parsed", (payload) => {
   const equityItems = items.filter((item) => classifyFeedItem(item) === "equity");
   const indexItems = items.filter((item) => classifyFeedItem(item) === "index");
 
+  maybeAutoSquareOff();
+
   if (equityItems.length > 0) {
     global.updateWatchlistFromLiveFeed(equityItems);
     processTradingEngines(equityItems);
-    maybeAutoSquareOff();
   }
 
   if (indexItems.length > 0) {
@@ -335,7 +451,7 @@ liveFeedClient.on("error", (error) => {
 liveFeedClient.on("close", (event) => {
   const code = event?.code ?? "unknown";
   const reason = event?.reason || "none";
-  global.setFeedHealth({
+  setFeedHealth({
     connected: false,
     status: "disconnected",
     reconnectAttempts: reconnectAttempts + 1
@@ -365,7 +481,7 @@ export function startLiveDataHandler(watchlist) {
   }
 
   liveFeedClient.subscribe("ifs", "nse_cm|Nifty 50", 2);
-  global.setFeedHealth({
+  setFeedHealth({
     staleAfterMs: LIVE_FEED_CONFIG.staleAfterMs,
     reconnectAttempts
   });
@@ -377,7 +493,7 @@ export function stopLiveDataHandler() {
   manualStop = true;
   clearReconnectTimer();
   clearHealthCheckTimer();
-  global.setFeedHealth({
+  setFeedHealth({
     connected: false,
     status: "stopped"
   });

@@ -68,7 +68,7 @@ test("live trading engine reuses signal and risk engines before submitting broke
       averageHistoricalVolPerMin: 100,
       intradayVolumeProfile: {}
     },
-    marketTrend: "flat",
+    marketTrend: "up",
     riskConfig: {
       totalMarginAvailable: 100000,
       availableMargin: 100000,

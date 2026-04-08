@@ -163,11 +163,55 @@ test("execution engine books a 50 percent partial exit on first target hit", () 
   assert.equal(result.partialExit.remainingQuantity, 5);
   assert.equal(engine.openPositions[0].quantity, 5);
   assert.equal(engine.openPositions[0].partialExitCount, 1);
-  assert.equal(engine.openPositions[0].stopLoss, 100);
+  assert.equal(engine.openPositions[0].stopLoss, 101.5);
   assert.equal(engine.openPositions[0].targetActive, true);
   assert.equal(engine.openPositions[0].secondTarget, 104);
   assert.ok(engine.openPositions[0].realizedPnl > 0);
   deletePosition("TESTPARTIAL");
+});
+
+test("partial exit does not loosen an already improved stop loss", () => {
+  deletePosition("TESTPARTIALTIGHT");
+  const engine = new ExecutionEngine();
+  const baseTrade = {
+    tradeId: "TEST-PARTIAL-TIGHT-1",
+    symbol: "TESTPARTIALTIGHT",
+    side: "LONG",
+    entry: 100,
+    stopLoss: 101.2,
+    target: 102,
+    secondTarget: 104,
+    quantity: 10,
+    initialQuantity: 10,
+    riskAmount: 10,
+    allocatedMargin: 1000,
+    strategy: "test",
+    tradeDate: "2026-04-08",
+    timestamp: "2026-04-08 12:00",
+    currentPrice: 101.8,
+    unrealizedPnl: 18,
+    realizedPnl: 0,
+    partialExitCount: 0,
+    partialExitHistory: [],
+    targetActive: true,
+    status: "OPEN",
+    highestPrice: 101.7,
+    lowestPrice: 100,
+    initialRiskPerUnit: 1
+  };
+
+  engine.paperTrades = [{ ...baseTrade }];
+  engine.openPositions = [{ ...baseTrade }];
+
+  const result = engine.updateMarketPrice({
+    symbol: "TESTPARTIALTIGHT",
+    ltp: 102,
+    timestamp: "2026-04-08 12:05"
+  });
+
+  assert.ok(result.partialExit);
+  assert.equal(engine.openPositions[0].stopLoss, 101.5);
+  deletePosition("TESTPARTIALTIGHT");
 });
 
 test("execution engine closes the runner at second target after partial exit", () => {

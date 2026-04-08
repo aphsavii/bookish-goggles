@@ -83,6 +83,29 @@ export function initializeDatabase() {
       payload_json TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS trade_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id TEXT NOT NULL,
+      trade_date TEXT NOT NULL,
+      timestamp_ist TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      symbol TEXT,
+      side TEXT,
+      trade_id TEXT,
+      status TEXT,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_trade_events_trade_date
+      ON trade_events(trade_date);
+
+    CREATE INDEX IF NOT EXISTS idx_trade_events_symbol_trade_date
+      ON trade_events(symbol, trade_date);
+
+    CREATE INDEX IF NOT EXISTS idx_trade_events_trade_id
+      ON trade_events(trade_id);
   `);
 
   ensureColumn("trades", "trade_id", "TEXT");
@@ -101,6 +124,8 @@ export function initializeDatabase() {
   ensureColumn("positions", "allocated_margin", "REAL");
   ensureColumn("positions", "current_price", "REAL");
   ensureColumn("positions", "unrealized_pnl", "REAL");
+  ensureColumn("trade_events", "trade_id", "TEXT");
+  ensureColumn("trade_events", "status", "TEXT");
 
   databaseInitialized = true;
   if (!isTestEnvironment) {

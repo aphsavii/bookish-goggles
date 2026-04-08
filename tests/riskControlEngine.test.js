@@ -79,6 +79,20 @@ test("risk control blocks long signals when market trend is down", () => {
   assert.equal(result.reason, "market-trend-filter");
 });
 
+test("risk control blocks signals when market trend is flat", () => {
+  const engine = new RiskControlEngine();
+  const result = engine.validateSignal({
+    signal: createSignal(),
+    openPositions: [],
+    marketTrend: "flat",
+    riskConfig: createRiskConfig(),
+    allTrades: []
+  });
+
+  assert.equal(result.approved, false);
+  assert.equal(result.reason, "market-trend-flat");
+});
+
 test("risk control blocks when quantity falls below one share", () => {
   const engine = new RiskControlEngine();
   const result = engine.validateSignal({

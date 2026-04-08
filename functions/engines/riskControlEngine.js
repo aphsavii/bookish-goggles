@@ -47,9 +47,7 @@ class RiskControlEngine {
     const todaysTrades = allTrades.filter((trade) => trade.tradeDate === today);
     const todaysRisk = todaysTrades.reduce((sum, trade) => sum + (Number(trade.riskAmount) || 0), 0);
     const hasOpenPosition = openPositions.some((position) => position.symbol === signal.symbol);
-    const signalTimestamp = signal.timestamp
-      ? new Date(String(signal.timestamp).replace(" ", "T"))
-      : new Date();
+    const signalTimestamp = signal.timestamp ?? new Date();
 
     if (riskPerUnit <= 0) {
       return { approved: false, reason: "invalid-stop-loss" };
@@ -85,6 +83,10 @@ class RiskControlEngine {
 
     if (allocatedMargin > riskConfig.availableMargin) {
       return { approved: false, reason: "insufficient-margin" };
+    }
+
+    if (marketTrend === "flat") {
+      return { approved: false, reason: "market-trend-flat" };
     }
 
     if (marketTrend === "down" && signal.side === "LONG") {

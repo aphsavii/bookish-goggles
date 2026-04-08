@@ -1,4 +1,5 @@
 import { loadOpenPositions, loadTrades, saveTrade, updateTrade, upsertPosition, deletePosition } from "../../data/tradeStore.js";
+import { logTradeEvent } from "../../data/eventLogStore.js";
 import { getIstTimestamp } from "../../utils/time.js";
 import { mockBuyOrder, mockSellOrder } from "./mockOrderEngine.js";
 import { ORDER_SIMULATION_CONFIG, RISK_CONFIG } from "../../config/tradingConfig.js";
@@ -10,6 +11,16 @@ function calculatePnl({ side, entry, exitPrice, quantity }) {
 
 function roundPrice(value) {
   return Number(value.toFixed(2));
+}
+
+function getTighterStopLoss({ side, currentStopLoss, candidateStopLoss }) {
+  if (!Number.isFinite(candidateStopLoss)) {
+    return currentStopLoss;
+  }
+
+  return side === "LONG"
+    ? Math.max(currentStopLoss, candidateStopLoss)
+    : Math.min(currentStopLoss, candidateStopLoss);
 }
 
 function getActiveTarget(position) {
@@ -115,6 +126,43 @@ class ExecutionEngine {
     this.paperTrades.push(trade);
     this.openPositions.push(trade);
     saveTrade(trade);
+    logTradeEvent({
+      timestamp: trade.timestamp,
+      tradeDate: trade.tradeDate,
+      eventType: "entry-placed",
+      symbol: trade.symbol,
+      side: trade.side,
+      tradeId: trade.tradeId,
+      status: trade.status,
+      payload: {
+        strategy: trade.strategy,
+        requestedEntry: trade.requestedEntry,
+        entry: trade.entry,
+        stopLoss: trade.stopLoss,
+        target: trade.target,
+        secondTarget: trade.secondTarget,
+        quantity: trade.quantity,
+        riskAmount: trade.riskAmount,
+        allocatedMargin: trade.allocatedMargin,
+        initialRiskPerUnit: trade.initialRiskPerUnit,
+        partialExitTargetFraction: ORDER_SIMULATION_CONFIG.targetPartialExitFraction
+      }
+    });
+    logTradeEvent({
+      timestamp: trade.timestamp,
+      tradeDate: trade.tradeDate,
+      eventType: "position-opened",
+      symbol: trade.symbol,
+      side: trade.side,
+      tradeId: trade.tradeId,
+      status: trade.status,
+      payload: {
+        currentPrice: trade.currentPrice,
+        highestPrice: trade.highestPrice,
+        lowestPrice: trade.lowestPrice,
+        brokerStatus: trade.brokerStatus
+      }
+    });
     return trade;
   }
 
@@ -133,7 +181,8 @@ class ExecutionEngine {
       quantity: position.quantity
     });
 
-    updateTrailingStop(position, ltp);
+    const previousStopLoss = position.stopLoss;
+    const stopLossChanged = updateTrailingStop(position, ltp);
     const tradeIndex = this.paperTrades.findIndex((item) => item.tradeId === position.tradeId);
     if (tradeIndex !== -1 && this.paperTrades[tradeIndex].status === "OPEN") {
       this.paperTrades[tradeIndex] = {
@@ -147,6 +196,26 @@ class ExecutionEngine {
     }
 
     upsertPosition(position);
+
+    if (stopLossChanged) {
+      logTradeEvent({
+        timestamp,
+        tradeDate: position.tradeDate,
+        eventType: "stoploss-updated",
+        symbol,
+        side: position.side,
+        tradeId: position.tradeId,
+        status: position.status,
+        payload: {
+          previousStopLoss,
+          stopLoss: position.stopLoss,
+          currentPrice: ltp,
+          highestPrice: position.highestPrice,
+          lowestPrice: position.lowestPrice,
+          initialRiskPerUnit: getInitialRiskPerUnit(position)
+        }
+      });
+    }
 
     if (position.side === "LONG" && ltp <= position.stopLoss) {
       return {
@@ -281,7 +350,11 @@ class ExecutionEngine {
         reason: "target-partial-exit"
       }
     ];
-    position.stopLoss = roundPrice(position.entry);
+    position.stopLoss = roundPrice(getTighterStopLoss({
+      side: position.side,
+      currentStopLoss: Number(position.stopLoss),
+      candidateStopLoss: Number(position.entry)
+    }));
     position.targetActive = Number.isFinite(Number(position.secondTarget));
     position.currentPrice = filledExitPrice;
     position.unrealizedPnl = calculatePnl({
@@ -301,6 +374,26 @@ class ExecutionEngine {
     }
 
     upsertPosition(position);
+
+    logTradeEvent({
+      timestamp: exitTimestamp,
+      tradeDate: position.tradeDate,
+      eventType: "partial-exit",
+      symbol: position.symbol,
+      side: position.side,
+      tradeId: position.tradeId,
+      status: position.status,
+      payload: {
+        quantity: partialQuantity,
+        remainingQuantity: position.quantity,
+        exitPrice: filledExitPrice,
+        pnl: realizedPnl,
+        stopLoss: position.stopLoss,
+        target: position.target,
+        secondTarget: position.secondTarget,
+        partialExitCount: position.partialExitCount
+      }
+    });
 
     return {
       symbol: position.symbol,
@@ -341,6 +434,24 @@ class ExecutionEngine {
     }
 
     deletePosition(symbol);
+    logTradeEvent({
+      timestamp: exitTimestamp,
+      tradeDate: closedTrade.tradeDate,
+      eventType: "position-closed",
+      symbol: closedTrade.symbol,
+      side: closedTrade.side,
+      tradeId: closedTrade.tradeId,
+      status: closedTrade.status,
+      payload: {
+        requestedExitPrice: closedTrade.requestedExitPrice,
+        exitPrice: closedTrade.exitPrice,
+        pnl: closedTrade.pnl,
+        closedReason,
+        quantity: closedTrade.quantity,
+        realizedPnl: closedTrade.realizedPnl ?? 0,
+        partialExitCount: closedTrade.partialExitCount ?? 0
+      }
+    });
     return closedTrade;
   }
 

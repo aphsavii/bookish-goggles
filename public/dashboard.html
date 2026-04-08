@@ -321,6 +321,7 @@
         <button class="tab-button active" data-tab="market">Market</button>
         <button class="tab-button" data-tab="positions">Positions</button>
         <button class="tab-button" data-tab="trades">Trades</button>
+        <button class="tab-button" data-tab="logs">Logs</button>
       </div>
     </section>
 
@@ -477,12 +478,50 @@
         </div>
       </section>
     </section>
+
+    <section id="tab-logs" class="tab-panel">
+      <section class="panel">
+        <div class="toolbar">
+          <div>
+            <h2>Trade Logs</h2>
+            <div class="meta">Signals, risk decisions, entries, stop updates, exits, and feed status changes.</div>
+          </div>
+          <div class="toolbar-actions">
+            <label class="meta" for="log-date-filter">Log Date</label>
+            <input id="log-date-filter" class="filter-input" type="date" />
+            <label class="meta" for="log-symbol-filter">Symbol</label>
+            <input id="log-symbol-filter" class="filter-input" type="text" placeholder="SBIN" />
+            <label class="meta" for="log-event-filter">Event</label>
+            <input id="log-event-filter" class="filter-input" type="text" placeholder="signal-generated" />
+            <button id="log-date-reset" class="action-button" type="button">Today</button>
+          </div>
+        </div>
+        <div class="meta" id="logs-meta">Waiting for logs...</div>
+        <div class="scroll-table">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event</th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Trade Id</th>
+                <th>Status</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="logs-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
   </div>
 
   <script>
     let selectedSymbol = null;
     let closingSymbols = new Set();
     let activeTab = "market";
+    let logDates = [];
 
     function getTodayDateString() {
       const parts = new Intl.DateTimeFormat("en-CA", {
@@ -861,9 +900,102 @@
       }
     }
 
+    function formatLogPayload(payload) {
+      if (!payload || typeof payload !== "object") {
+        return "-";
+      }
+
+      const keys = [
+        "reason",
+        "strategy",
+        "setupType",
+        "signalModel",
+        "breakoutLevel",
+        "supportLevel",
+        "triggerLevel",
+        "atr",
+        "close",
+        "candleVolume",
+        "averageHistoricalVolPerMin",
+        "todayAverageVolumePerMin",
+        "timeOfDayAverageVolumePerMin",
+        "volumeConfirmationBasis",
+        "quantity",
+        "riskAmount",
+        "allocatedMargin",
+        "expectedEntry",
+        "entry",
+        "stopLoss",
+        "previousStopLoss",
+        "target",
+        "secondTarget",
+        "currentPrice",
+        "exitPrice",
+        "pnl",
+        "closedReason",
+        "reconnectAttempts"
+      ];
+
+      const entries = keys
+        .filter((key) => payload[key] !== undefined && payload[key] !== null)
+        .map((key) => `${key}: ${typeof payload[key] === "number" ? formatNumber(payload[key]) : payload[key]}`);
+
+      return entries.length > 0 ? entries.join(" | ") : JSON.stringify(payload);
+    }
+
+    function renderLogs(logs) {
+      const body = document.getElementById("logs-body");
+      const meta = document.getElementById("logs-meta");
+      const dateFilter = document.getElementById("log-date-filter").value || getTodayDateString();
+      const symbolFilter = document.getElementById("log-symbol-filter").value.trim().toUpperCase();
+      const eventFilter = document.getElementById("log-event-filter").value.trim();
+
+      meta.textContent = `${logs.length} event${logs.length === 1 ? "" : "s"} on ${dateFilter}${symbolFilter ? ` | ${symbolFilter}` : ""}${eventFilter ? ` | ${eventFilter}` : ""}`;
+
+      if (!logs.length) {
+        body.innerHTML = `<tr><td colspan="7" class="empty">No logs found for the selected filters.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = logs.map((item) => `
+        <tr>
+          <td>${item.timestamp ?? "-"}</td>
+          <td>${item.eventType ?? "-"}</td>
+          <td>${item.symbol ?? "-"}</td>
+          <td>${item.side ?? "-"}</td>
+          <td>${item.tradeId ?? "-"}</td>
+          <td>${item.status ?? "-"}</td>
+          <td>${formatLogPayload(item.payload)}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function fetchLogs() {
+      const params = new URLSearchParams();
+      const date = document.getElementById("log-date-filter").value || getTodayDateString();
+      const symbol = document.getElementById("log-symbol-filter").value.trim().toUpperCase();
+      const eventType = document.getElementById("log-event-filter").value.trim();
+
+      params.set("date", date);
+      params.set("limit", "500");
+      if (symbol) {
+        params.set("symbol", symbol);
+      }
+      if (eventType) {
+        params.set("eventType", eventType);
+      }
+
+      const response = await fetch(`/api/logs?${params.toString()}`);
+      return response.json();
+    }
+
     async function refresh() {
-      const response = await fetch("/api/dashboard");
-      const data = await response.json();
+      const [dashboardResponse, logsResponse] = await Promise.all([
+        fetch("/api/dashboard"),
+        fetchLogs()
+      ]);
+      const data = await dashboardResponse.json();
+      const logs = await logsResponse;
 
       renderWatchlist(data.watchlist ?? []);
       renderNifty(data.nifty50);
@@ -873,6 +1005,7 @@
       renderCandles(selectedSymbol, data.candles?.[selectedSymbol] ?? []);
       renderPositions(data.positions ?? []);
       renderTradeSummaries((data.trades ?? []).filter((trade) => trade.status === "CLOSED"));
+      renderLogs(logs ?? []);
     }
 
     document.querySelectorAll(".tab-button").forEach((button) => {
@@ -883,6 +1016,16 @@
     document.getElementById("trade-date-filter").addEventListener("change", refresh);
     document.getElementById("trade-date-reset").addEventListener("click", () => {
       document.getElementById("trade-date-filter").value = getTodayDateString();
+      refresh();
+    });
+    document.getElementById("log-date-filter").value = getTodayDateString();
+    document.getElementById("log-date-filter").addEventListener("change", refresh);
+    document.getElementById("log-symbol-filter").addEventListener("change", refresh);
+    document.getElementById("log-event-filter").addEventListener("change", refresh);
+    document.getElementById("log-date-reset").addEventListener("click", () => {
+      document.getElementById("log-date-filter").value = getTodayDateString();
+      document.getElementById("log-symbol-filter").value = "";
+      document.getElementById("log-event-filter").value = "";
       refresh();
     });
 
