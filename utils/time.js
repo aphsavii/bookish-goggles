@@ -57,6 +57,43 @@ export function getIstSecondsSinceMidnight(date = new Date()) {
   );
 }
 
+function parseTimeStringToSeconds(value) {
+  if (!value) {
+    return Number.NaN;
+  }
+
+  const match = String(value).trim().match(/(?:^|[ T])(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) {
+    return Number.NaN;
+  }
+
+  const [, hours, minutes, seconds = "00"] = match;
+  return (Number(hours) * 3600) + (Number(minutes) * 60) + Number(seconds);
+}
+
+export function getIstSecondsSinceMidnightFromValue(value = new Date()) {
+  if (value instanceof Date || typeof value === "number") {
+    return getIstSecondsSinceMidnight(new Date(value));
+  }
+
+  const rawValue = String(value ?? "").trim();
+  if (!rawValue) {
+    return getIstSecondsSinceMidnight(new Date());
+  }
+
+  const hasExplicitTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(rawValue);
+  if (!hasExplicitTimezone) {
+    return parseTimeStringToSeconds(rawValue);
+  }
+
+  const parsedDate = new Date(rawValue);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return Number.NaN;
+  }
+
+  return getIstSecondsSinceMidnight(parsedDate);
+}
+
 export function timeStringToSeconds(timeString) {
   if (!timeString) {
     return null;
@@ -67,10 +104,10 @@ export function timeStringToSeconds(timeString) {
 }
 
 export function isIstTimeOnOrAfter(timeString, date = new Date()) {
-  const currentSeconds = getIstSecondsSinceMidnight(date);
+  const currentSeconds = getIstSecondsSinceMidnightFromValue(date);
   const thresholdSeconds = timeStringToSeconds(timeString);
 
-  if (!Number.isFinite(thresholdSeconds)) {
+  if (!Number.isFinite(currentSeconds) || !Number.isFinite(thresholdSeconds)) {
     return false;
   }
 
