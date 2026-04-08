@@ -4,7 +4,7 @@ import { RiskControlEngine } from "../engines/riskControlEngine.js";
 import { BacktestExecutionEngine } from "./backtestExecutionEngine.js";
 import { calculateBacktestMetrics } from "./backtestMetrics.js";
 import { normalizeBacktestCandles } from "./normalizeBacktestData.js";
-import getBackTestData from "../../tests/getBackTestData.js";
+import { fetchHistoricalCandles } from "../helpers/fetchHistoricalCandles.js";
 
 function buildInstrument({ symbol, averageHistoricalVolPerMin = 0 }) {
   return {
@@ -26,7 +26,7 @@ export async function runBacktest({
   const riskControlEngine = new RiskControlEngine();
   const executionEngine = new BacktestExecutionEngine();
   const instrument = buildInstrument({ symbol, averageHistoricalVolPerMin });
-  const rawPayload = candles ?? await getBackTestData(symbolToken, fromDate, toDate);
+  const rawPayload = candles ?? await fetchHistoricalCandles(symbolToken, fromDate, toDate);
   const normalizedCandles = normalizeBacktestCandles(rawPayload);
   const closedCandles = [];
   const rejections = [];
@@ -50,7 +50,8 @@ export async function runBacktest({
       candle: closedCandle,
       previousCandles: closedCandles,
       instrument,
-      openPositions: executionEngine.getOpenPositions()
+      openPositions: executionEngine.getOpenPositions(),
+      marketTrend
     });
 
     closedCandles.push(closedCandle);

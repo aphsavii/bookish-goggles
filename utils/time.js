@@ -48,6 +48,13 @@ export function getIstTimeString(date = new Date()) {
   return `${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
+export function getIstDateTimeString(date = new Date(), includeSeconds = false) {
+  const parts = getIstDateParts(date);
+  return includeSeconds
+    ? `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`
+    : `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
 export function getIstSecondsSinceMidnight(date = new Date()) {
   const parts = getIstDateParts(date);
   return (

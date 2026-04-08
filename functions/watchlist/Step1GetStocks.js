@@ -1,5 +1,22 @@
 import axios from "axios";
 
+async function fetchStocksFromUrl(url) {
+  const response = await axios.get(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Accept": "application/json",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Referer": "https://www.nseindia.com/",
+      "Connection": "keep-alive",
+      "Cache-Control": "no-cache"
+    },
+    proxy: false,
+    timeout: 10000
+  });
+
+  return response.data?.data || [];
+}
+
 export async function fetchAndProcessStocks(filters = {}) {
   try {
     const {
@@ -8,13 +25,23 @@ export async function fetchAndProcessStocks(filters = {}) {
       minVolume = null,
       minTValue = null
     } = filters;
+    const ENVIRONMENT = process.env.ENVIRONMENT;
+    const primaryApiUrl = ENVIRONMENT == "DEV"
+      ? "https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
+      : "https://trade.aphsavii.workers.dev/";
 
-    const apiUrl = "https://trade.aphsavii.workers.dev/";
+    let stocks = [];
 
-    const response = await axios.get(apiUrl, {
-    });
+    try {
+      stocks = await fetchStocksFromUrl(primaryApiUrl);
+    } catch (primaryError) {
+      if (ENVIRONMENT !== "DEV") {
+        throw primaryError;
+      }
 
-    const stocks = response.data?.data || [];
+      console.warn(`[Watchlist] Primary NSE fetch failed, falling back to worker: ${primaryError.message}`);
+      stocks = await fetchStocksFromUrl("https://trade.aphsavii.workers.dev/");
+    }
 
     // ---- STEP 1: Transform ----
     const transformed = stocks.map((data) => {

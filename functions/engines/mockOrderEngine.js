@@ -13,6 +13,15 @@ function buildTarget(entry, stopLoss) {
   return Number(target.toFixed(2));
 }
 
+function buildSecondTarget(entry, stopLoss) {
+  const riskPerUnit = Math.abs(entry - stopLoss);
+  const isShort = stopLoss > entry;
+  const target = isShort
+    ? entry - (riskPerUnit * ORDER_SIMULATION_CONFIG.secondTargetRewardToRiskRatio)
+    : entry + (riskPerUnit * ORDER_SIMULATION_CONFIG.secondTargetRewardToRiskRatio);
+  return Number(target.toFixed(2));
+}
+
 function applySlippage(price, side, slippageBps) {
   const slippageFactor = slippageBps / 10000;
   const direction = side === "LONG" ? 1 : -1;
@@ -31,11 +40,9 @@ export function mockBuyOrder({ signal, riskDecision }) {
     return null;
   }
 
-  const filledEntry = applySlippage(
-    signal.close,
-    signal.side,
-    ORDER_SIMULATION_CONFIG.entrySlippageBps
-  );
+  const filledEntry = Number.isFinite(Number(riskDecision.expectedEntry))
+    ? Number(Number(riskDecision.expectedEntry).toFixed(2))
+    : applySlippage(signal.close, signal.side, ORDER_SIMULATION_CONFIG.entrySlippageBps);
   const allocatedMargin = Number((filledEntry * (riskDecision.quantity ?? 1)).toFixed(2));
 
   return {
@@ -47,10 +54,16 @@ export function mockBuyOrder({ signal, riskDecision }) {
     entry: filledEntry,
     stopLoss: riskDecision.stopLoss,
     target: buildTarget(filledEntry, riskDecision.stopLoss),
+    secondTarget: buildSecondTarget(filledEntry, riskDecision.stopLoss),
     quantity: riskDecision.quantity ?? 1,
+    initialQuantity: riskDecision.quantity ?? 1,
     riskAmount: riskDecision.riskAmount,
     allocatedMargin,
     initialRiskPerUnit: Number(Math.abs(filledEntry - riskDecision.stopLoss).toFixed(2)),
+    realizedPnl: 0,
+    partialExitCount: 0,
+    partialExitHistory: [],
+    targetActive: true,
     highestPrice: filledEntry,
     lowestPrice: filledEntry,
     strategy: signal.strategy,
@@ -92,7 +105,7 @@ export function mockSellOrder({ position, exitPrice, exitTimestamp, closedReason
     unrealizedPnl: 0,
     exitPrice: filledExitPrice,
     exitTimestamp,
-    pnl,
+    pnl: Number(((Number(position.realizedPnl) || 0) + pnl).toFixed(2)),
     closedReason,
     brokerStatus: ORDER_SIMULATION_CONFIG.assumedFillStatus,
     status: "CLOSED"

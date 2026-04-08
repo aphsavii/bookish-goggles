@@ -3,6 +3,7 @@ import { loadOpenPositions, loadTrades } from "./tradeStore.js";
 import { RISK_CONFIG } from "../config/tradingConfig.js";
 import { getIstTimestamp } from "../utils/time.js";
 import { getExchToken } from "./getData.js";
+import { mergeCandleIntoIntradayVolumeProfile } from "../functions/helpers/intradayVolumeProfile.js";
 
 function toNumber(value) {
   const parsed = Number(value);
@@ -25,6 +26,7 @@ class globalDataHandler {
     watchlistTokenMap = new Map();
     nifty50 = null;
     candles = {};
+    intradayVolumeProfiles = {};
     signals = [];
     trades = [];
     positions = [];
@@ -153,12 +155,21 @@ class globalDataHandler {
         };
     }
 
-    setNiftyTrend(trend) {
+    setNiftyTrend(trendOrSnapshot) {
         if (!this.nifty50) {
             return;
         }
 
-        this.nifty50.trend = trend;
+        if (typeof trendOrSnapshot === "string") {
+            this.nifty50.trend = trendOrSnapshot;
+            return;
+        }
+
+        this.nifty50 = {
+            ...this.nifty50,
+            ...trendOrSnapshot,
+            trend: trendOrSnapshot?.trend ?? this.nifty50.trend ?? "flat"
+        };
     }
 
     setCandles(symbol, candles) {
@@ -176,6 +187,32 @@ class globalDataHandler {
     getWatchlistItemByToken(token) {
         const symbol = this.watchlistTokenMap.get(String(token));
         return symbol ? this.getWatchlistItem(symbol) : null;
+    }
+
+    setIntradayVolumeProfiles(profiles = {}) {
+        this.intradayVolumeProfiles = { ...profiles };
+
+        for (const item of this.watchlist) {
+            item.intradayVolumeProfile = this.intradayVolumeProfiles[item.symbol] ?? {};
+        }
+    }
+
+    getIntradayVolumeProfile(symbol) {
+        return this.intradayVolumeProfiles[symbol] ? { ...this.intradayVolumeProfiles[symbol] } : {};
+    }
+
+    updateIntradayVolumeProfile(symbol, candle) {
+        if (!symbol) {
+            return;
+        }
+
+        const current = this.intradayVolumeProfiles[symbol] ?? {};
+        this.intradayVolumeProfiles[symbol] = mergeCandleIntoIntradayVolumeProfile(current, candle);
+
+        const watchlistItem = this.getWatchlistItem(symbol);
+        if (watchlistItem) {
+            watchlistItem.intradayVolumeProfile = this.intradayVolumeProfiles[symbol];
+        }
     }
 
     setSignals(signals) {
@@ -252,6 +289,7 @@ class globalDataHandler {
             watchlist: this.getWatchlist(),
             nifty50: this.getNifty50(),
             candles: this.getAllCandles(),
+            intradayVolumeProfiles: { ...this.intradayVolumeProfiles },
             signals: this.getSignals(),
             trades: this.getTrades(),
             positions: this.getPositions(),

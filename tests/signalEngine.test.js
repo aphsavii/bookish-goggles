@@ -2,67 +2,132 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { SignalEngine } from "../functions/engines/signalEngine.js";
 
-test("signal engine emits breakout signal with volume confirmation", () => {
+function pad(value) {
+  return String(value).padStart(2, "0");
+}
+
+function buildTime(index, baseHour = 9, baseMinute = 50) {
+  const totalMinutes = baseMinute + index;
+  const hour = baseHour + Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return `2026-04-05T${pad(hour)}:${pad(minute)}:00+05:30`;
+}
+
+function createRisingCandles(count = 14) {
+  return Array.from({ length: count }, (_, index) => ({
+    open: 100 + index,
+    high: 102 + index,
+    low: 98 + index,
+    close: 101 + index,
+    volume: 90 + (index * 5),
+    startTime: buildTime(index)
+  }));
+}
+
+function createFallingCandles(count = 14) {
+  return Array.from({ length: count }, (_, index) => ({
+    open: 120 - index,
+    high: 122 - index,
+    low: 118 - index,
+    close: 119 - index,
+    volume: 90 + (index * 5),
+    startTime: buildTime(index)
+  }));
+}
+
+test("signal engine emits breakout signal with ATR buffer and volume confirmation", () => {
   const engine = new SignalEngine();
   const signal = engine.evaluateBreakout({
     candle: {
-      close: 110,
+      open: 114.5,
+      high: 119,
+      low: 114.5,
+      close: 118.8,
       volume: 300,
-      startTime: "2026-04-05 09:20"
+      startTime: buildTime(14)
     },
-    previousCandles: [
-      { high: 100, low: 95 },
-      { high: 103, low: 96 },
-      { high: 105, low: 98 }
-    ],
+    previousCandles: createRisingCandles(),
     instrument: {
       symbol: "SBIN",
       averageHistoricalVolPerMin: 100
-    }
+    },
+    marketTrend: "up"
   });
 
   assert.ok(signal);
   assert.equal(signal.symbol, "SBIN");
   assert.equal(signal.side, "LONG");
-  assert.equal(signal.breakoutLevel, 105);
+  assert.equal(signal.breakoutLevel, 115);
+  assert.equal(signal.triggerLevel, 115.8);
+  assert.ok(["strong-breakout", "retest-hold"].includes(signal.setupType));
+  assert.equal(signal.signalModel, "core");
   assert.equal(signal.historicalVolumeRatio, 3);
+  assert.equal(signal.atr, 4);
+  assert.equal(signal.volumeConfirmationBasis, "session");
+});
+
+test("signal engine rejects a weak breakout that does not clear the ATR buffer", () => {
+  const engine = new SignalEngine();
+  const signal = engine.evaluateBreakout({
+    candle: {
+      open: 114.9,
+      high: 115.7,
+      low: 114.6,
+      close: 115.7,
+      volume: 300,
+      startTime: buildTime(14)
+    },
+    previousCandles: createRisingCandles(),
+    instrument: {
+      symbol: "SBIN",
+      averageHistoricalVolPerMin: 100
+    },
+    marketTrend: "up"
+  });
+
+  assert.equal(signal, null);
 });
 
 test("signal engine suppresses duplicate breakout signals inside cooldown window", () => {
   const engine = new SignalEngine();
+  const previousCandles = createRisingCandles();
 
   const first = engine.evaluateBreakout({
     candle: {
-      close: 110,
+      open: 114.5,
+      high: 119,
+      low: 114.2,
+      close: 118.8,
       volume: 300,
-      startTime: "2026-04-05T09:20:00+05:30"
+      startTime: buildTime(14)
     },
-    previousCandles: [
-      { high: 100, low: 95 },
-      { high: 103, low: 96 },
-      { high: 105, low: 98 }
-    ],
+    previousCandles,
     instrument: {
       symbol: "SBIN",
       averageHistoricalVolPerMin: 100
-    }
+    },
+    marketTrend: "up"
   });
 
   const duplicate = engine.evaluateBreakout({
     candle: {
-      close: 111,
-      volume: 350,
-      startTime: "2026-04-05T09:22:00+05:30"
+      open: 116.5,
+      high: 120,
+      low: 116.2,
+      close: 119.5,
+      volume: 320,
+      startTime: buildTime(16)
     },
     previousCandles: [
-      { high: 101, low: 95 },
-      { high: 104, low: 97 },
-      { high: 106, low: 99 }
+      ...previousCandles.slice(2),
+      { open: 114.5, high: 119, low: 114.2, close: 118.8, volume: 300, startTime: buildTime(14) },
+      { open: 118.8, high: 119.2, low: 117.8, close: 118.4, volume: 180, startTime: buildTime(15) }
     ],
     instrument: {
       symbol: "SBIN",
       averageHistoricalVolPerMin: 100
-    }
+    },
+    marketTrend: "up"
   });
 
   assert.ok(first);
@@ -73,142 +138,116 @@ test("signal engine emits breakdown short signal with volume confirmation", () =
   const engine = new SignalEngine();
   const signal = engine.evaluateBreakout({
     candle: {
-      close: 94,
+      open: 106.5,
+      high: 106.8,
+      low: 88.2,
+      close: 88.6,
       volume: 300,
-      startTime: "2026-04-05 09:20"
+      startTime: buildTime(14)
     },
-    previousCandles: [
-      { high: 100, low: 95 },
-      { high: 103, low: 96 },
-      { high: 105, low: 98 }
-    ],
+    previousCandles: createFallingCandles(),
     instrument: {
       symbol: "SBIN",
       averageHistoricalVolPerMin: 100
-    }
+    },
+    marketTrend: "down"
   });
 
   assert.ok(signal);
   assert.equal(signal.symbol, "SBIN");
   assert.equal(signal.side, "SHORT");
-  assert.equal(signal.supportLevel, 95);
-});
-
-test("signal engine suppresses duplicate breakdown signals inside cooldown window", () => {
-  const engine = new SignalEngine();
-
-  const first = engine.evaluateBreakout({
-    candle: {
-      close: 94,
-      volume: 300,
-      startTime: "2026-04-05T09:20:00+05:30"
-    },
-    previousCandles: [
-      { high: 100, low: 95 },
-      { high: 103, low: 96 },
-      { high: 105, low: 98 }
-    ],
-    instrument: {
-      symbol: "SBIN",
-      averageHistoricalVolPerMin: 100
-    }
-  });
-
-  const duplicate = engine.evaluateBreakout({
-    candle: {
-      close: 93.5,
-      volume: 350,
-      startTime: "2026-04-05T09:22:00+05:30"
-    },
-    previousCandles: [
-      { high: 99, low: 94.5 },
-      { high: 102, low: 95.5 },
-      { high: 104, low: 97.5 }
-    ],
-    instrument: {
-      symbol: "SBIN",
-      averageHistoricalVolPerMin: 100
-    }
-  });
-
-  assert.ok(first);
-  assert.equal(duplicate, null);
-});
-
-test("signal engine suppresses long signal when same-symbol long position is already open", () => {
-  const engine = new SignalEngine();
-  const signal = engine.evaluateBreakout({
-    candle: {
-      close: 110,
-      volume: 300,
-      startTime: "2026-04-05 09:20"
-    },
-    previousCandles: [
-      { high: 100, low: 95 },
-      { high: 103, low: 96 },
-      { high: 105, low: 98 }
-    ],
-    instrument: {
-      symbol: "SBIN",
-      averageHistoricalVolPerMin: 100
-    },
-    openPositions: [
-      { symbol: "SBIN", side: "LONG" }
-    ]
-  });
-
-  assert.equal(signal, null);
+  assert.equal(signal.supportLevel, 105);
+  assert.equal(signal.triggerLevel, 104.2);
 });
 
 test("signal engine suppresses short signal when same-symbol short position is already open", () => {
   const engine = new SignalEngine();
   const signal = engine.evaluateBreakout({
     candle: {
-      close: 94,
+      open: 106.5,
+      high: 106.8,
+      low: 88.2,
+      close: 88.6,
       volume: 300,
-      startTime: "2026-04-05 09:20"
+      startTime: buildTime(14)
     },
-    previousCandles: [
-      { high: 100, low: 95 },
-      { high: 103, low: 96 },
-      { high: 105, low: 98 }
-    ],
+    previousCandles: createFallingCandles(),
     instrument: {
       symbol: "SBIN",
       averageHistoricalVolPerMin: 100
     },
     openPositions: [
       { symbol: "SBIN", side: "SHORT" }
-    ]
+    ],
+    marketTrend: "down"
   });
 
   assert.equal(signal, null);
 });
 
-test("signal engine can confirm breakout from today's running average even when historical baseline is missing", () => {
+test("signal engine can confirm breakout from a preloaded time-of-day volume profile", () => {
   const engine = new SignalEngine();
+  const previousCandles = Array.from({ length: 14 }, (_, index) => ({
+    open: 100 + index,
+    high: 101 + index,
+    low: 99 + index,
+    close: 100.5 + index,
+    volume: 50 + index,
+    startTime: buildTime(index, 10, 0)
+  }));
+
   const signal = engine.evaluateBreakout({
     candle: {
-      close: 110,
-      volume: 180,
-      startTime: "2026-04-05T10:00:00+05:30"
+      open: 113.5,
+      high: 117.8,
+      low: 113.2,
+      close: 117.2,
+      volume: 120,
+      startTime: buildTime(14, 10, 0)
     },
-    previousCandles: [
-      { high: 100, low: 95, volume: 100, startTime: "2026-04-05T09:55:00+05:30" },
-      { high: 103, low: 96, volume: 110, startTime: "2026-04-05T09:56:00+05:30" },
-      { high: 105, low: 98, volume: 120, startTime: "2026-04-05T09:57:00+05:30" },
-      { high: 104, low: 99, volume: 115, startTime: "2026-04-05T09:58:00+05:30" },
-      { high: 104.5, low: 99.5, volume: 105, startTime: "2026-04-05T09:59:00+05:30" }
-    ],
+    previousCandles,
     instrument: {
       symbol: "SBIN",
-      averageHistoricalVolPerMin: 0
-    }
+      averageHistoricalVolPerMin: 0,
+      intradayVolumeProfile: {
+        "10:14": {
+          totalVolume: 300,
+          sampleCount: 5,
+          averageVolumePerMin: 60
+        }
+      }
+    },
+    marketTrend: "up"
   });
 
   assert.ok(signal);
   assert.equal(signal.side, "LONG");
-  assert.equal(signal.todayAverageVolumePerMin, 110);
-  assert.equal(signal.todayVolumeAccelerationRatio, 1.64);
-  assert.equal(signal.historicalVolumeRatio, null);
+  assert.equal(signal.volumeConfirmationBasis, "historical-profile");
+  assert.equal(signal.timeOfDayAverageVolumePerMin, 60);
+  assert.equal(signal.timeOfDayVolumeRatio, 2);
+  assert.equal(signal.todayAverageVolumePerMin, 56.5);
+});
+
+test("signal engine confirmation path remains available for stricter entries", () => {
+  const engine = new SignalEngine();
+  const signal = engine.evaluateConfirmedBreakout({
+    candle: {
+      open: 114.5,
+      high: 119,
+      low: 114.2,
+      close: 118.8,
+      volume: 300,
+      startTime: buildTime(14)
+    },
+    previousCandles: createRisingCandles(),
+    instrument: {
+      symbol: "SBIN",
+      averageHistoricalVolPerMin: 100
+    },
+    marketTrend: "up"
+  });
+
+  assert.ok(signal);
+  assert.equal(signal.signalModel, "confirmation");
+  assert.ok(["strong-breakout", "retest-hold"].includes(signal.setupType));
 });

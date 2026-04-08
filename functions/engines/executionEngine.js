@@ -12,6 +12,21 @@ function roundPrice(value) {
   return Number(value.toFixed(2));
 }
 
+function getActiveTarget(position) {
+  const hasScaledOut = Number(position.partialExitCount || 0) > 0;
+  return hasScaledOut ? Number(position.secondTarget) : Number(position.target);
+}
+
+function getPartialExitQuantity(quantity, fraction = ORDER_SIMULATION_CONFIG.targetPartialExitFraction ?? 0.5) {
+  const numericQuantity = Number(quantity);
+  if (!Number.isFinite(numericQuantity) || numericQuantity <= 1) {
+    return 0;
+  }
+
+  const partialQuantity = Math.floor(numericQuantity * fraction);
+  return Math.min(Math.max(partialQuantity, 1), numericQuantity - 1);
+}
+
 function getInitialRiskPerUnit(position) {
   if (Number.isFinite(position.initialRiskPerUnit) && position.initialRiskPerUnit > 0) {
     return position.initialRiskPerUnit;
@@ -145,13 +160,35 @@ class ExecutionEngine {
       };
     }
 
-    if (position.side === "LONG" && Number.isFinite(position.target) && ltp >= position.target) {
+    const activeTarget = getActiveTarget(position);
+
+    if (
+      position.side === "LONG" &&
+      position.targetActive !== false &&
+      Number.isFinite(activeTarget) &&
+      ltp >= activeTarget
+    ) {
+      if (Number(position.partialExitCount || 0) === 0) {
+        const partialExit = this.takePartialTargetExit({
+          symbol,
+          exitPrice: ltp,
+          exitTimestamp: timestamp
+        });
+        if (partialExit) {
+          return {
+            closedTrade: null,
+            partialExit,
+            positionUpdated: true
+          };
+        }
+      }
+
       return {
         closedTrade: this.closePosition({
           symbol,
           exitPrice: ltp,
           exitTimestamp: timestamp,
-          closedReason: "target-hit"
+          closedReason: Number(position.partialExitCount || 0) > 0 ? "second-target-hit" : "target-hit"
         }),
         positionUpdated: true
       };
@@ -169,13 +206,33 @@ class ExecutionEngine {
       };
     }
 
-    if (position.side === "SHORT" && Number.isFinite(position.target) && ltp <= position.target) {
+    if (
+      position.side === "SHORT" &&
+      position.targetActive !== false &&
+      Number.isFinite(activeTarget) &&
+      ltp <= activeTarget
+    ) {
+      if (Number(position.partialExitCount || 0) === 0) {
+        const partialExit = this.takePartialTargetExit({
+          symbol,
+          exitPrice: ltp,
+          exitTimestamp: timestamp
+        });
+        if (partialExit) {
+          return {
+            closedTrade: null,
+            partialExit,
+            positionUpdated: true
+          };
+        }
+      }
+
       return {
         closedTrade: this.closePosition({
           symbol,
           exitPrice: ltp,
           exitTimestamp: timestamp,
-          closedReason: "target-hit"
+          closedReason: Number(position.partialExitCount || 0) > 0 ? "second-target-hit" : "target-hit"
         }),
         positionUpdated: true
       };
@@ -184,6 +241,76 @@ class ExecutionEngine {
     return {
       closedTrade: null,
       positionUpdated: true
+    };
+  }
+
+  takePartialTargetExit({ symbol, exitPrice, exitTimestamp = getIstTimestamp() }) {
+    const position = this.openPositions.find((item) => item.symbol === symbol);
+    if (!position || position.targetActive === false) {
+      return null;
+    }
+
+    const partialQuantity = getPartialExitQuantity(position.quantity);
+    if (partialQuantity < 1) {
+      return null;
+    }
+
+    const closingSide = position.side === "LONG" ? "SHORT" : "LONG";
+    const slippageFactor = ORDER_SIMULATION_CONFIG.exitSlippageBps / 10000;
+    const direction = closingSide === "LONG" ? 1 : -1;
+    const filledExitPrice = Number((Number(exitPrice) * (1 + (direction * slippageFactor))).toFixed(2));
+    const realizedPnl = calculatePnl({
+      side: position.side,
+      entry: position.entry,
+      exitPrice: filledExitPrice,
+      quantity: partialQuantity
+    });
+
+    position.quantity -= partialQuantity;
+    position.allocatedMargin = Number((position.entry * position.quantity).toFixed(2));
+    position.riskAmount = Number((getInitialRiskPerUnit(position) * position.quantity).toFixed(2));
+    position.realizedPnl = Number(((Number(position.realizedPnl) || 0) + realizedPnl).toFixed(2));
+    position.partialExitCount = Number(position.partialExitCount || 0) + 1;
+    position.partialExitHistory = [
+      ...(Array.isArray(position.partialExitHistory) ? position.partialExitHistory : []),
+      {
+        quantity: partialQuantity,
+        exitPrice: filledExitPrice,
+        exitTimestamp,
+        pnl: realizedPnl,
+        reason: "target-partial-exit"
+      }
+    ];
+    position.stopLoss = roundPrice(position.entry);
+    position.targetActive = Number.isFinite(Number(position.secondTarget));
+    position.currentPrice = filledExitPrice;
+    position.unrealizedPnl = calculatePnl({
+      side: position.side,
+      entry: position.entry,
+      exitPrice: filledExitPrice,
+      quantity: position.quantity
+    });
+
+    const tradeIndex = this.paperTrades.findIndex((item) => item.tradeId === position.tradeId);
+    if (tradeIndex !== -1) {
+      this.paperTrades[tradeIndex] = {
+        ...this.paperTrades[tradeIndex],
+        ...position
+      };
+      updateTrade(this.paperTrades[tradeIndex]);
+    }
+
+    upsertPosition(position);
+
+    return {
+      symbol: position.symbol,
+      side: position.side,
+      quantity: partialQuantity,
+      remainingQuantity: position.quantity,
+      exitPrice: filledExitPrice,
+      exitTimestamp,
+      pnl: realizedPnl,
+      reason: "target-partial-exit"
     };
   }
 

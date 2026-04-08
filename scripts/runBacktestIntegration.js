@@ -1,7 +1,7 @@
 import getWatchList from "../functions/watchlist/getWatchList.js";
 import { runBacktest } from "../functions/backtest/backtestRunner.js";
 import { normalizeBacktestCandles } from "../functions/backtest/normalizeBacktestData.js";
-import getBackTestData from "../tests/getBackTestData.js";
+import { fetchHistoricalCandles } from "../functions/helpers/fetchHistoricalCandles.js";
 import { getExchToken } from "../data/getData.js";
 import { getIstDateParts } from "../utils/time.js";
 
@@ -93,7 +93,7 @@ function printScenarioTable(results = []) {
 }
 
 async function runSingleSymbolBacktest({ symbol, symbolToken, fromDate, toDate }) {
-  const rawPayload = await getBackTestData(symbolToken, fromDate, toDate);
+  const rawPayload = await fetchHistoricalCandles(symbolToken, fromDate, toDate);
   const candles = normalizeBacktestCandles(rawPayload);
   const averageHistoricalVolPerMin = calculateAverageVolumePerMinute(candles);
 

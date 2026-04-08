@@ -19,6 +19,7 @@ function createSignal() {
     symbol: "SBIN",
     side: "LONG",
     close: 100,
+    atr: 4,
     timestamp: "2026-04-05 10:00"
   };
 }
@@ -28,6 +29,7 @@ function createShortSignal() {
     symbol: "SBIN",
     side: "SHORT",
     close: 100,
+    atr: 4,
     timestamp: "2026-04-05 10:00"
   };
 }
@@ -43,8 +45,10 @@ test("risk control approves a valid signal", () => {
   });
 
   assert.equal(result.approved, true);
-  assert.equal(result.quantity, 250);
-  assert.equal(result.allocatedMargin, 25000);
+  assert.equal(result.stopLoss, 94);
+  assert.equal(result.quantity, 165);
+  assert.equal(result.allocatedMargin, 16508.25);
+  assert.equal(result.expectedEntry, 100.05);
 });
 
 test("risk control blocks duplicate open position", () => {
@@ -102,8 +106,9 @@ test("risk control approves a valid short signal with stop loss above entry", ()
   });
 
   assert.equal(result.approved, true);
-  assert.equal(result.stopLoss, 101);
-  assert.equal(result.quantity, 250);
+  assert.equal(result.stopLoss, 106);
+  assert.equal(result.quantity, 165);
+  assert.equal(result.expectedEntry, 99.95);
 });
 
 test("risk control blocks new entries after session cutoff", () => {

@@ -1,5 +1,6 @@
 import { startLiveDataHandler } from "./functions/liveDataHandler.js";
 import global from "./data/global.js";
+import { preloadIntradayVolumeProfiles } from "./functions/helpers/preloadIntradayVolumeProfiles.js";
 export const startApp = async () => {
   try {
     console.log("[App] Starting application...");
@@ -9,6 +10,8 @@ export const startApp = async () => {
     console.log(`[App] NEO_SOCKET_URL: ${process.env.NEO_SOCKET_URL}`);
     
     await global.setGlobalData();
+    const intradayVolumeProfiles = await preloadIntradayVolumeProfiles(global.watchlist);
+    global.setIntradayVolumeProfiles(intradayVolumeProfiles);
     startLiveDataHandler(global.watchlist);
   } catch (error) {
     console.error("[App] Fatal error:", error.message);

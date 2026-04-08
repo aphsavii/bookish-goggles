@@ -3,6 +3,7 @@ import { startApp } from './app.js';
 import { initializeDatabase } from './data/sqliteClient.js';
 import global from './data/global.js';
 import { runBacktest } from './functions/backtest/backtestRunner.js';
+import { executionEngine } from './functions/engines/executionEngine.js';
 import { getLiveFeedSnapshot } from './functions/liveDataHandler.js';
 const app = express();
 const PORT = 3000;
@@ -45,6 +46,50 @@ app.get("/api/signals", (_req, res) => {
 
 app.get("/api/trades", (_req, res) => {
     res.json(global.getTrades());
+});
+
+app.post("/api/positions/:symbol/close", (req, res) => {
+    try {
+        const symbol = String(req.params.symbol || "").trim();
+        if (!symbol) {
+            res.status(400).json({ error: "Missing symbol" });
+            return;
+        }
+
+        const openPosition = executionEngine.getOpenPositions().find((position) => position.symbol === symbol);
+        if (!openPosition) {
+            res.status(404).json({ error: "Position not found" });
+            return;
+        }
+
+        const requestedExitPrice = Number(req.body?.exitPrice);
+        const marketExitPrice = Number.isFinite(requestedExitPrice)
+            ? requestedExitPrice
+            : Number(global.getWatchlistItem(symbol)?.ltp);
+
+        if (!Number.isFinite(marketExitPrice)) {
+            res.status(400).json({ error: "Exit price unavailable" });
+            return;
+        }
+
+        const closedTrade = executionEngine.closePosition({
+            symbol,
+            exitPrice: marketExitPrice,
+            closedReason: "manual-exit"
+        });
+
+        if (!closedTrade) {
+            res.status(500).json({ error: "Failed to close position" });
+            return;
+        }
+
+        global.setTrades(executionEngine.getPaperTrades());
+        global.setPositions(executionEngine.getOpenPositions());
+
+        res.json({ success: true, trade: closedTrade });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.get("/api/dashboard", (_req, res) => {

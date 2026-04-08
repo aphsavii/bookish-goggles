@@ -84,9 +84,9 @@ async function fetchHistoricalTradeData(symbol, {
   const resolvedFromDate = fromDate || formatDate(
     new Date(new Date().setDate(new Date().getDate() - 10))
   );
-
-  const uri = `https://nameless-hat-8a61.aphsavii.workers.dev/api/historical-data?symbol=${symbol}&series=${series}&fromDate=${resolvedFromDate}&toDate=${resolvedToDate}`;
-
+  const ENVIRONMENT = process.env.ENVIRONMENT;
+  let uri = `https://nameless-hat-8a61.aphsavii.workers.dev/api/historical-data?symbol=${symbol}&series=${series}&fromDate=${resolvedFromDate}&toDate=${resolvedToDate}`;
+  if(ENVIRONMENT=== "DEV") uri = `https://www.nseindia.com/api/NextApi/apiClient/GetQuoteApi?functionName=getHistoricalTradeData&symbol=${symbol}&series=${series}&fromDate=${resolvedFromDate}&toDate=${resolvedToDate}`
   const maxRetries = 3;
   let lastError;
 
@@ -100,6 +100,7 @@ async function fetchHistoricalTradeData(symbol, {
           "Accept-Language": "en-US,en;q=0.9",
           "Cache-Control": "no-cache"
         },
+        proxy: false,
         timeout: 10000
       });
 

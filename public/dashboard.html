@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trade Dashboard v2</title>
+  <title>Trade Dashboard</title>
   <style>
     :root {
       --bg: #0d1117;
       --panel: #151b23;
-      --panel-2: #1d2632;
+      --panel-2: #1c2531;
       --line: #2a3441;
       --text: #e6edf3;
       --muted: #9aa7b5;
@@ -26,8 +26,8 @@
       margin: 0;
       padding: 24px;
       background:
-        radial-gradient(circle at top right, rgba(78, 161, 255, 0.18), transparent 30%),
-        radial-gradient(circle at top left, rgba(29, 185, 84, 0.12), transparent 25%),
+        radial-gradient(circle at top right, rgba(78, 161, 255, 0.18), transparent 28%),
+        radial-gradient(circle at top left, rgba(29, 185, 84, 0.12), transparent 24%),
         var(--bg);
       color: var(--text);
       font: 14px/1.4 "Segoe UI", sans-serif;
@@ -37,29 +37,127 @@
       margin: 0 0 12px;
     }
 
-    .dashboard {
+    .shell {
+      max-width: 1500px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tab-button {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+    }
+
+    .tab-button.active {
+      border-color: rgba(78, 161, 255, 0.55);
+      background: rgba(78, 161, 255, 0.16);
+      color: #dcecff;
+    }
+
+    .tab-panel {
+      display: none;
+      gap: 16px;
+    }
+
+    .tab-panel.active {
+      display: grid;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent), var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+    }
+
+    .grid-2 {
       display: grid;
       grid-template-columns: 1.4fr 1fr;
       gap: 16px;
     }
 
-    .panel {
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
-    }
-
-    .top-grid {
+    .grid-4 {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 16px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
     }
 
-    .meta {
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .cards {
+      display: grid;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .summary-card {
+      min-height: 100px;
+    }
+
+    .summary-label {
       color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .summary-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .summary-value.up { color: var(--up); }
+    .summary-value.down { color: var(--down); }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--accent);
       font-size: 12px;
     }
 
@@ -70,7 +168,7 @@
       border-radius: 999px;
       padding: 6px 10px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       text-transform: uppercase;
     }
 
@@ -78,13 +176,58 @@
     .badge.down { background: rgba(229, 83, 75, 0.15); color: var(--down); }
     .badge.flat { background: rgba(212, 167, 44, 0.15); color: var(--flat); }
 
-    .watchlist-table {
+    .action-button,
+    .filter-input {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: inherit;
+    }
+
+    .action-button {
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .action-button.danger {
+      background: rgba(229, 83, 75, 0.16);
+      border-color: rgba(229, 83, 75, 0.36);
+      color: #ffd7d4;
+    }
+
+    .action-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .watchlist-table,
+    .data-table {
       width: 100%;
       border-collapse: collapse;
     }
 
     .watchlist-table th,
-    .watchlist-table td {
+    .watchlist-table td,
+    .data-table th,
+    .data-table td {
       text-align: left;
       padding: 10px 8px;
       border-bottom: 1px solid var(--line);
@@ -93,12 +236,27 @@
     }
 
     .watchlist-table tr:hover {
-      background: rgba(255,255,255,0.03);
+      background: rgba(255, 255, 255, 0.03);
       cursor: pointer;
     }
 
     .watchlist-table tr.active {
       background: rgba(78, 161, 255, 0.12);
+    }
+
+    .scroll-table {
+      overflow: auto;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 12px;
+      font-size: 13px;
+    }
+
+    .kv span:nth-child(odd) {
+      color: var(--muted);
     }
 
     .candles {
@@ -139,118 +297,204 @@
       font-size: 10px;
     }
 
-    .cards {
-      display: grid;
-      gap: 12px;
-    }
-
-    .card {
-      background: var(--panel-2);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 12px;
-    }
-
-    .kv {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 6px 12px;
-      font-size: 13px;
-    }
-
-    .kv span:nth-child(odd) {
+    .empty {
       color: var(--muted);
+      padding: 20px 0;
     }
 
-    .pill {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      color: var(--accent);
-      font-size: 12px;
-    }
-
-    @media (max-width: 1100px) {
-      .dashboard {
-        grid-template-columns: 1fr;
-      }
-
-      .top-grid {
+    @media (max-width: 1200px) {
+      .grid-2,
+      .grid-4 {
         grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
 <body>
-  <div class="top-grid">
-    <section class="panel">
-      <h1>Live Watchlist v2</h1>
-      <div class="meta" id="watchlist-meta">Waiting for data...</div>
-      <table class="watchlist-table">
-        <thead>
-          <tr>
-            <th>Symbol</th>
-            <th>LTP</th>
-            <th>VWAP</th>
-            <th>Gap %</th>
-            <th>PChange</th>
-            <th>Avg Hist Vol/Min</th>
-            <th>Updated</th>
-          </tr>
-        </thead>
-        <tbody id="watchlist-body"></tbody>
-      </table>
+  <div class="shell">
+    <section class="panel hero">
+      <div>
+        <h1>Trading Dashboard</h1>
+        <div class="meta">Split into operating tabs so live market state, open positions, and trade reporting stay separate.</div>
+      </div>
+      <div class="tabs">
+        <button class="tab-button active" data-tab="market">Market</button>
+        <button class="tab-button" data-tab="positions">Positions</button>
+        <button class="tab-button" data-tab="trades">Trades</button>
+      </div>
     </section>
 
-    <section class="panel">
-      <h1>Nifty 50</h1>
-      <div id="nifty-card" class="cards"></div>
+    <section id="tab-market" class="tab-panel active">
+      <div class="grid-4">
+        <section class="panel">
+          <h2>Nifty 50</h2>
+          <div id="nifty-card" class="cards"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Socket Status</h2>
+          <div id="feed-health" class="cards"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Risk Control</h2>
+          <div id="risk-card" class="cards"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Live Snapshot</h2>
+          <div id="market-summary" class="cards"></div>
+        </section>
+      </div>
+
+      <div class="grid-2">
+        <section class="panel">
+          <div class="toolbar">
+            <div>
+              <h2>Watchlist</h2>
+              <div class="meta" id="watchlist-meta">Waiting for data...</div>
+            </div>
+          </div>
+          <div class="scroll-table">
+            <table class="watchlist-table">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>LTP</th>
+                  <th>VWAP</th>
+                  <th>Gap %</th>
+                  <th>PChange</th>
+                  <th>Avg Hist Vol/Min</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody id="watchlist-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 id="candles-title">1 Minute Candles</h2>
+          <div class="meta" id="candles-meta">Select a symbol from watchlist</div>
+          <div id="candles" class="candles"></div>
+        </section>
+      </div>
     </section>
-  </div>
 
-  <div class="top-grid">
-    <section class="panel">
-      <h2>Risk Control</h2>
-      <div id="risk-card" class="cards"></div>
+    <section id="tab-positions" class="tab-panel">
+      <section class="panel">
+        <div class="toolbar">
+          <div>
+            <h2>Open Positions</h2>
+            <div class="meta">Manual exit is available from here.</div>
+          </div>
+          <div class="meta" id="positions-meta">Waiting for data...</div>
+        </div>
+        <div id="positions" class="cards"></div>
+      </section>
     </section>
 
-    <section class="panel">
-      <h2>Feed Health</h2>
-      <div id="feed-health" class="cards"></div>
-    </section>
-  </div>
+    <section id="tab-trades" class="tab-panel">
+      <div class="grid-4">
+        <section class="panel summary-card">
+          <div class="summary-label">Overall PnL Till Now</div>
+          <div class="summary-value" id="overall-pnl">-</div>
+          <div class="meta" id="overall-pnl-meta">Closed trades only</div>
+        </section>
 
-  <div class="top-grid">
-    <section class="panel">
-      <h2>Open Positions</h2>
-      <div id="positions" class="cards"></div>
-    </section>
+        <section class="panel summary-card">
+          <div class="summary-label">Today's PnL</div>
+          <div class="summary-value" id="today-pnl">-</div>
+          <div class="meta" id="today-pnl-meta">Filtered to selected date</div>
+        </section>
 
-    <section class="panel">
-      <h2>Closed Trades</h2>
-      <div id="closed-trades" class="cards"></div>
-    </section>
-  </div>
+        <section class="panel summary-card">
+          <div class="summary-label">Today's Closed Trades</div>
+          <div class="summary-value" id="today-trades-count">-</div>
+          <div class="meta" id="today-trades-meta">Filtered to selected date</div>
+        </section>
 
-  <div class="dashboard">
-    <section class="panel">
-      <h2 id="candles-title">1 Minute Candles</h2>
-      <div class="meta" id="candles-meta">Select a symbol from watchlist</div>
-      <div id="candles" class="candles"></div>
-    </section>
+        <section class="panel summary-card">
+          <div class="summary-label">Lifetime Closed Trades</div>
+          <div class="summary-value" id="lifetime-trades-count">-</div>
+          <div class="meta">Stored in trade history</div>
+        </section>
+      </div>
 
-    <section class="panel">
-      <h2>Signals</h2>
-      <div id="signals" class="cards"></div>
+      <section class="panel">
+        <div class="toolbar">
+          <div>
+            <h2>Closed Trades</h2>
+            <div class="meta">Defaults to today's date. Change the filter to inspect any day.</div>
+          </div>
+          <div class="toolbar-actions">
+            <label class="meta" for="trade-date-filter">Trade Date</label>
+            <input id="trade-date-filter" class="filter-input" type="date" />
+            <button id="trade-date-reset" class="action-button" type="button">Today</button>
+          </div>
+        </div>
+        <div class="scroll-table">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>Qty</th>
+                <th>PnL</th>
+                <th>Reason</th>
+                <th>Exit Time</th>
+              </tr>
+            </thead>
+            <tbody id="closed-trades-body"></tbody>
+          </table>
+        </div>
+      </section>
 
-      <h2 style="margin-top: 18px;">Paper Trades</h2>
-      <div id="trades" class="cards"></div>
+      <section class="panel">
+        <div class="toolbar">
+          <div>
+            <h2>Day Wise Summary</h2>
+            <div class="meta">Aggregated from closed trades across all saved sessions.</div>
+          </div>
+        </div>
+        <div class="scroll-table">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Trades</th>
+                <th>Wins</th>
+                <th>Losses</th>
+                <th>Gross Profit</th>
+                <th>Gross Loss</th>
+                <th>Net PnL</th>
+              </tr>
+            </thead>
+            <tbody id="daily-summary-body"></tbody>
+          </table>
+        </div>
+      </section>
     </section>
   </div>
 
   <script>
     let selectedSymbol = null;
+    let closingSymbols = new Set();
+    let activeTab = "market";
+
+    function getTodayDateString() {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(new Date());
+
+      const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${map.year}-${map.month}-${map.day}`;
+    }
 
     function formatNumber(value, digits = 2) {
       if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -261,6 +505,61 @@
 
     function formatTrendBadge(trend = "flat") {
       return `<span class="badge ${trend}">${trend}</span>`;
+    }
+
+    function getTradeDate(trade) {
+      return String(trade.exitTimestamp ?? trade.tradeDate ?? trade.timestamp ?? "").slice(0, 10);
+    }
+
+    function toSignedClass(value) {
+      return Number(value) >= 0 ? "up" : "down";
+    }
+
+    function setActiveTab(tabName) {
+      activeTab = tabName;
+      document.querySelectorAll(".tab-button").forEach((button) => {
+        button.classList.toggle("active", button.getAttribute("data-tab") === tabName);
+      });
+      document.querySelectorAll(".tab-panel").forEach((panel) => {
+        panel.classList.toggle("active", panel.id === `tab-${tabName}`);
+      });
+    }
+
+    function groupTradesByDate(trades) {
+      const grouped = new Map();
+
+      for (const trade of trades) {
+        const dateKey = getTradeDate(trade);
+        if (!dateKey) {
+          continue;
+        }
+
+        const current = grouped.get(dateKey) ?? {
+          date: dateKey,
+          trades: 0,
+          wins: 0,
+          losses: 0,
+          grossProfit: 0,
+          grossLoss: 0,
+          netPnl: 0
+        };
+
+        const pnl = Number(trade.pnl) || 0;
+        current.trades += 1;
+        current.netPnl += pnl;
+
+        if (pnl >= 0) {
+          current.wins += 1;
+          current.grossProfit += pnl;
+        } else {
+          current.losses += 1;
+          current.grossLoss += pnl;
+        }
+
+        grouped.set(dateKey, current);
+      }
+
+      return [...grouped.values()].sort((left, right) => right.date.localeCompare(left.date));
     }
 
     function renderWatchlist(watchlist) {
@@ -296,6 +595,31 @@
       }
     }
 
+    async function closePosition(symbol) {
+      if (!symbol || closingSymbols.has(symbol)) {
+        return;
+      }
+
+      closingSymbols.add(symbol);
+      try {
+        const response = await fetch(`/api/positions/${encodeURIComponent(symbol)}/close`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "Failed to close position");
+        }
+        await refresh();
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        closingSymbols.delete(symbol);
+      }
+    }
+
     function renderNifty(nifty) {
       const container = document.getElementById("nifty-card");
       if (!nifty) {
@@ -305,7 +629,7 @@
 
       container.innerHTML = `
         <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div class="card-header">
             <strong>${nifty.symbol}</strong>
             ${formatTrendBadge(nifty.trend)}
           </div>
@@ -316,6 +640,10 @@
             <span>Open</span><span>${formatNumber(nifty.open)}</span>
             <span>High</span><span>${formatNumber(nifty.high)}</span>
             <span>Low</span><span>${formatNumber(nifty.low)}</span>
+            <span>Fast EMA</span><span>${formatNumber(nifty.fastEma)}</span>
+            <span>Slow EMA</span><span>${formatNumber(nifty.slowEma)}</span>
+            <span>Slow Slope %</span><span>${formatNumber(nifty.slowSlopePct, 3)}</span>
+            <span>Min Slope %</span><span>${formatNumber(nifty.minSlopePct, 3)}</span>
             <span>Updated</span><span>${nifty.lastUpdated ?? "-"}</span>
           </div>
         </div>
@@ -357,7 +685,7 @@
 
       container.innerHTML = `
         <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div class="card-header">
             <strong>Websocket</strong>
             ${formatTrendBadge(trend)}
           </div>
@@ -372,11 +700,32 @@
       `;
     }
 
+    function renderMarketSummary(data) {
+      const container = document.getElementById("market-summary");
+      const watchlist = data.watchlist ?? [];
+      const positions = data.positions ?? [];
+      const signals = data.signals ?? [];
+      const activeWatchlistItem = watchlist.find((item) => item.symbol === selectedSymbol) ?? watchlist[0] ?? null;
+
+      container.innerHTML = `
+        <div class="card">
+          <div class="kv">
+            <span>Selected Symbol</span><span>${activeWatchlistItem?.symbol ?? "-"}</span>
+            <span>Selected LTP</span><span>${formatNumber(activeWatchlistItem?.ltp)}</span>
+            <span>Open Positions</span><span>${positions.length}</span>
+            <span>Total Signals</span><span>${signals.length}</span>
+            <span>Closed Trades</span><span>${(data.trades ?? []).filter((trade) => trade.status === "CLOSED").length}</span>
+            <span>Last Update</span><span>${activeWatchlistItem?.lastUpdated ?? "-"}</span>
+          </div>
+        </div>
+      `;
+    }
+
     function renderCandles(symbol, candles) {
       const container = document.getElementById("candles");
       const title = document.getElementById("candles-title");
       const meta = document.getElementById("candles-meta");
-      title.textContent = `1 Minute Candles${symbol ? ` · ${symbol}` : ""}`;
+      title.textContent = `1 Minute Candles${symbol ? ` | ${symbol}` : ""}`;
 
       if (!candles || candles.length === 0) {
         container.innerHTML = "";
@@ -386,8 +735,8 @@
 
       meta.textContent = `${candles.length} candles`;
       const recent = candles.slice(-12);
-      const maxHigh = Math.max(...recent.map((c) => c.high));
-      const minLow = Math.min(...recent.map((c) => c.low));
+      const maxHigh = Math.max(...recent.map((candle) => candle.high));
+      const minLow = Math.min(...recent.map((candle) => candle.low));
       const range = Math.max(maxHigh - minLow, 0.01);
 
       container.innerHTML = recent.map((candle) => {
@@ -416,21 +765,24 @@
       container.innerHTML = items.map(mapper).join("");
     }
 
-    async function refresh() {
-      const res = await fetch("/api/dashboard");
-      const data = await res.json();
+    function renderPositions(positions) {
+      const meta = document.getElementById("positions-meta");
+      meta.textContent = `${positions.length} open position${positions.length === 1 ? "" : "s"}`;
 
-      renderWatchlist(data.watchlist ?? []);
-      renderNifty(data.nifty50);
-      renderRisk(data.risk);
-      renderFeedHealth(data.feedHealth);
-      renderCandles(selectedSymbol, data.candles?.[selectedSymbol] ?? []);
-
-      renderCards("positions", data.positions ?? [], "No open positions.", (position) => `
+      renderCards("positions", positions, "No open positions.", (position) => `
         <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <strong>${position.symbol}</strong>
-            <span class="pill">${position.status}</span>
+          <div class="card-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <strong>${position.symbol}</strong>
+              <span class="pill">${position.status}</span>
+            </div>
+            <button
+              class="action-button danger"
+              data-close-position="${position.symbol}"
+              ${closingSymbols.has(position.symbol) ? "disabled" : ""}
+            >
+              Exit
+            </button>
           </div>
           <div class="kv">
             <span>Side</span><span>${position.side}</span>
@@ -447,59 +799,92 @@
         </div>
       `);
 
-      renderCards("closed-trades", (data.trades ?? []).filter((trade) => trade.status === "CLOSED"), "No closed trades yet.", (trade) => `
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <strong>${trade.symbol}</strong>
-            <span class="pill">${trade.closedReason ?? trade.status}</span>
-          </div>
-          <div class="kv">
-            <span>Entry</span><span>${formatNumber(trade.entry)}</span>
-            <span>Requested Exit</span><span>${formatNumber(trade.requestedExitPrice)}</span>
-            <span>Exit</span><span>${formatNumber(trade.exitPrice)}</span>
-            <span>PnL</span><span>${formatNumber(trade.pnl)}</span>
-            <span>Exit Time</span><span>${trade.exitTimestamp ?? "-"}</span>
-          </div>
-        </div>
-      `);
-
-      renderCards("signals", data.signals ?? [], "No signals yet.", (signal) => `
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <strong>${signal.symbol}</strong>
-            <span class="pill">${signal.side}</span>
-          </div>
-          <div class="kv">
-            <span>Strategy</span><span>${signal.strategy}</span>
-            <span>Breakout</span><span>${formatNumber(signal.breakoutLevel)}</span>
-            <span>Close</span><span>${formatNumber(signal.close)}</span>
-            <span>Candle Vol</span><span>${formatNumber(signal.candleVolume)}</span>
-            <span>Avg Hist Vol/Min</span><span>${formatNumber(signal.averageHistoricalVolPerMin)}</span>
-            <span>Timestamp</span><span>${signal.timestamp}</span>
-          </div>
-        </div>
-      `);
-
-      renderCards("trades", data.trades ?? [], "No paper trades yet.", (trade) => `
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <strong>${trade.symbol}</strong>
-            <span class="pill">${trade.status}</span>
-          </div>
-          <div class="kv">
-            <span>Side</span><span>${trade.side}</span>
-            <span>Entry</span><span>${formatNumber(trade.entry)}</span>
-            <span>Requested Entry</span><span>${formatNumber(trade.requestedEntry)}</span>
-            <span>Stop Loss</span><span>${formatNumber(trade.stopLoss)}</span>
-            <span>Target</span><span>${formatNumber(trade.target)}</span>
-            <span>Allocated Margin</span><span>${formatNumber(trade.allocatedMargin)}</span>
-            <span>PnL</span><span>${formatNumber(trade.pnl)}</span>
-            <span>Strategy</span><span>${trade.strategy}</span>
-            <span>Timestamp</span><span>${trade.timestamp}</span>
-          </div>
-        </div>
-      `);
+      document.querySelectorAll("[data-close-position]").forEach((button) => {
+        button.onclick = () => closePosition(button.getAttribute("data-close-position"));
+      });
     }
+
+    function renderTradeSummaries(closedTrades) {
+      const dateFilter = document.getElementById("trade-date-filter").value || getTodayDateString();
+      const filteredTrades = closedTrades.filter((trade) => getTradeDate(trade) === dateFilter);
+      const overallPnl = closedTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+      const todayPnl = filteredTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+
+      document.getElementById("overall-pnl").textContent = formatNumber(overallPnl);
+      document.getElementById("overall-pnl").className = `summary-value ${toSignedClass(overallPnl)}`;
+      document.getElementById("today-pnl").textContent = formatNumber(todayPnl);
+      document.getElementById("today-pnl").className = `summary-value ${toSignedClass(todayPnl)}`;
+      document.getElementById("today-trades-count").textContent = String(filteredTrades.length);
+      document.getElementById("today-trades-count").className = "summary-value";
+      document.getElementById("lifetime-trades-count").textContent = String(closedTrades.length);
+      document.getElementById("lifetime-trades-count").className = "summary-value";
+      document.getElementById("today-pnl-meta").textContent = `Date ${dateFilter}`;
+      document.getElementById("today-trades-meta").textContent = `Date ${dateFilter}`;
+      document.getElementById("overall-pnl-meta").textContent = `${closedTrades.length} closed trade${closedTrades.length === 1 ? "" : "s"}`;
+
+      const closedTradesBody = document.getElementById("closed-trades-body");
+      if (filteredTrades.length === 0) {
+        closedTradesBody.innerHTML = `<tr><td colspan="8" class="empty">No closed trades for the selected date.</td></tr>`;
+      } else {
+        closedTradesBody.innerHTML = filteredTrades
+          .sort((left, right) => String(right.exitTimestamp ?? "").localeCompare(String(left.exitTimestamp ?? "")))
+          .map((trade) => `
+            <tr>
+              <td>${trade.symbol}</td>
+              <td>${trade.side}</td>
+              <td>${formatNumber(trade.entry)}</td>
+              <td>${formatNumber(trade.exitPrice)}</td>
+              <td>${trade.quantity ?? "-"}</td>
+              <td>${formatNumber(trade.pnl)}</td>
+              <td>${trade.closedReason ?? "-"}</td>
+              <td>${trade.exitTimestamp ?? "-"}</td>
+            </tr>
+          `).join("");
+      }
+
+      const dailySummaryBody = document.getElementById("daily-summary-body");
+      const grouped = groupTradesByDate(closedTrades);
+      if (grouped.length === 0) {
+        dailySummaryBody.innerHTML = `<tr><td colspan="7" class="empty">No closed trade history available.</td></tr>`;
+      } else {
+        dailySummaryBody.innerHTML = grouped.map((row) => `
+          <tr>
+            <td>${row.date}</td>
+            <td>${row.trades}</td>
+            <td>${row.wins}</td>
+            <td>${row.losses}</td>
+            <td>${formatNumber(row.grossProfit)}</td>
+            <td>${formatNumber(row.grossLoss)}</td>
+            <td>${formatNumber(row.netPnl)}</td>
+          </tr>
+        `).join("");
+      }
+    }
+
+    async function refresh() {
+      const response = await fetch("/api/dashboard");
+      const data = await response.json();
+
+      renderWatchlist(data.watchlist ?? []);
+      renderNifty(data.nifty50);
+      renderRisk(data.risk);
+      renderFeedHealth(data.feedHealth);
+      renderMarketSummary(data);
+      renderCandles(selectedSymbol, data.candles?.[selectedSymbol] ?? []);
+      renderPositions(data.positions ?? []);
+      renderTradeSummaries((data.trades ?? []).filter((trade) => trade.status === "CLOSED"));
+    }
+
+    document.querySelectorAll(".tab-button").forEach((button) => {
+      button.addEventListener("click", () => setActiveTab(button.getAttribute("data-tab")));
+    });
+
+    document.getElementById("trade-date-filter").value = getTodayDateString();
+    document.getElementById("trade-date-filter").addEventListener("change", refresh);
+    document.getElementById("trade-date-reset").addEventListener("click", () => {
+      document.getElementById("trade-date-filter").value = getTodayDateString();
+      refresh();
+    });
 
     refresh();
     setInterval(refresh, 2000);

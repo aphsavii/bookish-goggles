@@ -5,8 +5,9 @@ import { candleEngine } from "./engines/candleEngine.js";
 import { signalEngine } from "./engines/signalEngine.js";
 import { riskControlEngine } from "./engines/riskControlEngine.js";
 import { executionEngine } from "./engines/executionEngine.js";
-import { LIVE_FEED_CONFIG, TREND_CONFIG, SESSION_CONFIG } from "../config/tradingConfig.js";
+import { LIVE_FEED_CONFIG, SESSION_CONFIG } from "../config/tradingConfig.js";
 import { getIstTimestamp, isIstTimeOnOrAfter } from "../utils/time.js";
+import { analyzeNiftyTrend } from "./helpers/trendEngine.js";
 
 const liveFeedClient = createLiveFeedClient();
 const isDebugFeedEnabled = process.env.DEBUG_FEED === "true";
@@ -137,10 +138,12 @@ function processTradingEngines(equityItems) {
       candle: closedCandle,
       previousCandles: candleEngine.getCandles(symbol).slice(0, -1),
       instrument,
-      openPositions: executionEngine.getOpenPositions()
+      openPositions: executionEngine.getOpenPositions(),
+      marketTrend: global.getNifty50()?.trend ?? "flat"
     });
 
     if (!signal) {
+      global.updateIntradayVolumeProfile(symbol, closedCandle);
       continue;
     }
 
@@ -153,6 +156,7 @@ function processTradingEngines(equityItems) {
     });
 
     if (!riskDecision.approved) {
+      global.updateIntradayVolumeProfile(symbol, closedCandle);
       continue;
     }
 
@@ -166,6 +170,8 @@ function processTradingEngines(equityItems) {
         `Executed paper trade: ${trade.symbol} ${trade.side} entry=${trade.entry} stop=${trade.stopLoss} target=${trade.target} qty=${trade.quantity}`
       );
     }
+
+    global.updateIntradayVolumeProfile(symbol, closedCandle);
   }
 }
 
@@ -214,36 +220,6 @@ function updateIndexCandles(indexItems) {
 
     global.setCandles(symbol, latestCandles);
   }
-}
-
-function getNiftyTrendFromCandles() {
-  const candles = global.getCandles("NIFTY50");
-
-  if (candles.length < TREND_CONFIG.niftyLookbackCandles) {
-    return "flat";
-  }
-
-  const recentCandles = candles.slice(-TREND_CONFIG.niftyLookbackCandles);
-  const closes = recentCandles.map((candle) => candle.close);
-  const highs = recentCandles.map((candle) => candle.high);
-  const lows = recentCandles.map((candle) => candle.low);
-
-  const firstClose = closes[0];
-  const lastClose = closes[closes.length - 1];
-  const higherHighs = highs[highs.length - 1] > highs[0];
-  const higherLows = lows[lows.length - 1] > lows[0];
-  const lowerHighs = highs[highs.length - 1] < highs[0];
-  const lowerLows = lows[lows.length - 1] < lows[0];
-
-  if (lastClose > firstClose && higherHighs && higherLows) {
-    return "up";
-  }
-
-  if (lastClose < firstClose && lowerHighs && lowerLows) {
-    return "down";
-  }
-
-  return "flat";
 }
 
 function clearReconnectTimer() {
@@ -347,7 +323,7 @@ liveFeedClient.on("parsed", (payload) => {
     updateIndexCandles(indexItems);
     global.updateNiftyFromLiveFeed(indexItems);
     if (global.getNifty50()) {
-      global.setNiftyTrend(getNiftyTrendFromCandles());
+      global.setNiftyTrend(analyzeNiftyTrend(global.getCandles("NIFTY50")));
     }
   }
 });
